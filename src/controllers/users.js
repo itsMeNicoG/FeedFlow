@@ -1,6 +1,4 @@
-import { Database } from "bun:sqlite";
-
-const db = new Database("feedflow.sqlite");
+import { db } from "../db/connection.js";
 
 export const createUser = async (c) => {
   try {

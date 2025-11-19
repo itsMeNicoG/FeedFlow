@@ -5,7 +5,8 @@
   "scripts": {
     "start": "bun run src/index.js",
     "dev": "bun run --watch src/index.js",
-    "db:setup": "bun run src/db/setup.js"
+    "db:setup": "bun run src/db/setup.js",
+    "test": "bun test"
   },
   "dependencies": {
     "hono": "^3.10.0"

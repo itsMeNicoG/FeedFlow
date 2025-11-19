@@ -1,7 +1,4 @@
-import { Database } from "bun:sqlite";
-
-// Conectar a la base de datos existente
-const db = new Database("feedflow.sqlite");
+import { db } from "../db/connection.js";
 
 export const createCompany = async (c) => {
   try {
