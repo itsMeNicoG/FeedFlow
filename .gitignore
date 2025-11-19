@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Database
+*.sqlite
+*.sqlite-journal
+
+# Environment variables
+.env
+
+# User Context (Requested to be ignored)
+Context/
+
+# OS metadata
+.DS_Store
+Thumbs.db
