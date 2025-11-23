@@ -14,6 +14,12 @@ const result = await Bun.build({
   },
   sourcemap: 'external', // Sourcemaps para debugging en producción
   splitting: false, // No dividir en chunks (mejor para servers monolíticos)
+  // Externalizar dependencias pesadas - se cargarán desde node_modules en runtime
+  external: [
+    'exceljs',      // ~20 MB - librería de Excel muy pesada
+    'jspdf',        // ~28 MB - generación de PDF
+    'better-sqlite3' // Driver nativo de SQLite
+  ]
 });
 
 if (result.success) {

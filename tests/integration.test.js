@@ -168,4 +168,84 @@ describe("FeedFlow API Integration Tests", () => {
     expect(res.status).toBe(201);
   });
 
+  // --- TEST: MODIFICAR ENCUESTA (Solo Creador) ---
+  test("PUT /surveys/:id - Creador puede modificar encuesta", async () => {
+    const res = await app.request(`/surveys/${surveyId}`, {
+      method: "PUT",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
+      body: JSON.stringify({
+        title: "Encuesta Modificada",
+        description: "Descripción actualizada"
+      })
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.title).toBe("Encuesta Modificada");
+  });
+
+  // --- TEST: LISTAR USUARIOS ---
+  test("GET /users - Debe listar usuarios de la empresa", async () => {
+    const res = await app.request(`/users?company_id=${companyId}`, {
+      headers: { "Authorization": `Bearer ${creatorToken}` }
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.length).toBe(2); // Creador y Analista
+  });
+
+  // --- TEST: CAMBIAR ESTADO DE USUARIO ---
+  test("PATCH /users/:id/status - Debe cambiar estado del usuario", async () => {
+    const res = await app.request(`/users/${analystId}/status`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
+      body: JSON.stringify({ status: "inactive" })
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.status).toBe("inactive");
+
+    // Reactivar para no romper otros tests
+    await app.request(`/users/${analystId}/status`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
+      body: JSON.stringify({ status: "active" })
+    });
+  });
+
+  // --- TEST: ACCESO POR LINK CORTO ---
+  test("GET /s/:slug - Debe retornar encuesta por link corto (público)", async () => {
+    // Primero obtener el slug de la encuesta
+    const surveyData = db.query("SELECT link_slug FROM surveys WHERE id = ?").get(surveyId);
+    
+    const res = await app.request(`/s/${surveyData.link_slug}`);
+    
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.id).toBe(surveyId);
+    expect(json.data.questions).toBeDefined();
+  });
+
+  // --- TEST: EXPORTAR A EXCEL ---
+  test("GET /reports/:companyId/export?format=xlsx - Analista puede exportar a Excel", async () => {
+    const res = await app.request(`/reports/${companyId}/export?survey_id=${surveyId}&format=xlsx`, {
+      headers: { "Authorization": `Bearer ${analystToken}` }
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toContain('spreadsheet');
+  });
+
+  // --- TEST: EXPORTAR A PDF ---
+  test("GET /reports/:companyId/export?format=pdf - Analista puede exportar a PDF", async () => {
+    const res = await app.request(`/reports/${companyId}/export?survey_id=${surveyId}&format=pdf`, {
+      headers: { "Authorization": `Bearer ${analystToken}` }
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('application/pdf');
+  });
+
 });

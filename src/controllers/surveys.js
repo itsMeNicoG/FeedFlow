@@ -149,6 +149,73 @@ export const getSurveyById = (c) => {
 };
 
 /**
+ * Updates an existing survey's metadata
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with updated survey data
+ * @throws {Error} If survey not found or validation fails
+ * 
+ * @description
+ * Allows updating survey metadata (title, description, dates).
+ * Does NOT modify questions - use question endpoints for that.
+ * Only updates fields provided in request body.
+ * 
+ * @example
+ * PUT /surveys/1
+ * Body: { "title": "Updated Title", "end_date": "2025-12-31" }
+ * Response: { "message": "Encuesta actualizada", "data": { "id": 1, "title": "Updated Title", ... } }
+ */
+export const updateSurvey = async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    
+    // Verificar que la encuesta existe
+    const existing = db.query("SELECT * FROM surveys WHERE id = ?").get(id);
+    
+    if (!existing) {
+      return c.json({ error: "Encuesta no encontrada" }, 404);
+    }
+
+    // Campos permitidos para actualizar
+    const allowedFields = ['title', 'description', 'start_date', 'end_date'];
+    const updates = {};
+    
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    }
+
+    // Si no hay campos para actualizar
+    if (Object.keys(updates).length === 0) {
+      return c.json({ error: "No se proporcionaron campos para actualizar" }, 400);
+    }
+
+    // Construir query dinámico
+    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    
+    const updateQuery = db.query(`
+      UPDATE surveys 
+      SET ${setClause}
+      WHERE id = ?
+      RETURNING *
+    `);
+
+    const result = updateQuery.get(...values, id);
+
+    return c.json({
+      message: "Encuesta actualizada exitosamente",
+      data: result
+    });
+
+  } catch (error) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+/**
  * Deletes a survey and all related data (cascades to questions, options, responses)
  * @param {import('hono').Context} c - Hono context object
  * @returns {Response} JSON confirmation message
@@ -262,6 +329,74 @@ export const duplicateSurvey = async (c) => {
       message: "Encuesta duplicada exitosamente",
       data: { id: result.id, title: newTitle }
     }, 201);
+
+  } catch (error) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+/**
+ * Retrieves a survey by its short link slug
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON response with survey and questions (public endpoint)
+ * @throws {Error} If survey not found or slug is invalid
+ * 
+ * @description
+ * Public endpoint for accessing surveys via short link.
+ * Returns full survey data with questions and options for form rendering.
+ * Does NOT require authentication - used for public survey responses.
+ * 
+ * @example
+ * GET /s/abc12345
+ * Response: { "data": { "id": 10, "title": "...", "questions": [...] } }
+ */
+export const getSurveyBySlug = (c) => {
+  try {
+    const slug = c.req.param('slug');
+    
+    if (!slug) {
+      return c.json({ error: "Slug inválido" }, 400);
+    }
+
+    // 1. Obtener la encuesta por slug
+    const querySurvey = db.query("SELECT * FROM surveys WHERE link_slug = ?");
+    const survey = querySurvey.get(slug);
+
+    if (!survey) {
+      return c.json({ error: "Encuesta no encontrada" }, 404);
+    }
+
+    // 2. Obtener las preguntas
+    const queryQuestions = db.query("SELECT * FROM questions WHERE survey_id = ? ORDER BY \"order\" ASC, id ASC");
+    const questions = queryQuestions.all(survey.id);
+
+    // 3. Obtener las opciones
+    const questionIds = questions.map(q => q.id);
+    let options = [];
+    if (questionIds.length > 0) {
+      const placeholders = questionIds.map(() => '?').join(',');
+      const queryOptions = db.query(`SELECT * FROM options WHERE question_id IN (${placeholders})`);
+      options = queryOptions.all(...questionIds);
+    }
+
+    // 4. Anidar opciones dentro de preguntas
+    const questionsWithOptions = questions.map(q => {
+      return {
+        ...q,
+        options: options.filter(o => o.question_id === q.id)
+      };
+    });
+
+    return c.json({ 
+      data: {
+        id: survey.id,
+        title: survey.title,
+        description: survey.description,
+        start_date: survey.start_date,
+        end_date: survey.end_date,
+        questions: questionsWithOptions
+      } 
+    });
 
   } catch (error) {
     return c.json({ error: error.message }, 500);

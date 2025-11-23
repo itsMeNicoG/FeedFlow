@@ -4,14 +4,15 @@
  * @description
  * Role-based access:
  * - GET routes: Accessible to all authenticated users
- * - POST/DELETE routes: Restricted to 'creator' role only
+ * - POST/PUT/DELETE routes: Restricted to 'creator' role only
  */
 
 import { Hono } from 'hono';
 import { 
   createSurvey, 
   getSurveys, 
-  getSurveyById, 
+  getSurveyById,
+  updateSurvey, 
   deleteSurvey, 
   duplicateSurvey 
 } from '../controllers/surveys.js';
@@ -37,6 +38,12 @@ app.get('/:id', getSurveyById);
  * @access creator role only
  */
 app.post('/', requireRole('creator'), createSurvey);
+
+/**
+ * PUT /surveys/:id - Update survey metadata
+ * @access creator role only
+ */
+app.put('/:id', requireRole('creator'), updateSurvey);
 
 /**
  * DELETE /surveys/:id - Delete survey and all related data

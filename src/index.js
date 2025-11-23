@@ -5,6 +5,7 @@ import surveys from './routes/surveys.js';
 import reports from './routes/reports.js';
 import auth from './routes/auth.js';
 import { submitResponse, webhookWhatsapp } from './controllers/responses.js';
+import { getSurveyBySlug } from './controllers/surveys.js';
 import { authMiddleware, checkUserActive } from './middleware/auth.js';
 
 const app = new Hono();
@@ -16,6 +17,7 @@ app.get('/', (c) => {
 
 // Rutas Públicas (No requieren login)
 app.route('/auth', auth); // Login
+app.get('/s/:slug', getSurveyBySlug); // Acceso por link corto
 app.post('/submit/:surveyId', submitResponse); // Responder encuesta
 app.post('/webhook/whatsapp', webhookWhatsapp); // Webhook
 
