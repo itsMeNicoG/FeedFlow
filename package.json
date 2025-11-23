@@ -6,7 +6,9 @@
     "start": "bun run src/index.js",
     "dev": "bun run --watch src/index.js",
     "db:setup": "bun run src/db/setup.js",
-    "test": "bun test"
+    "test": "bun test",
+    "build": "bun run build.js",
+    "start:prod": "NODE_ENV=production bun run dist/index.js"
   },
   "dependencies": {
     "hono": "^3.10.0"

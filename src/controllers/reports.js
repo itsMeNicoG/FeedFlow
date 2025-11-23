@@ -1,5 +1,30 @@
+/**
+ * @fileoverview Report generation controller - Aggregates and analyzes survey responses
+ * @module controllers/reports
+ */
+
 import { db } from "../db/connection.js";
 
+/**
+ * Generates aggregated report for a specific survey
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON response with aggregated survey results
+ * @throws {Error} If survey not found or doesn't belong to company
+ * 
+ * @description
+ * Aggregates responses by question type:
+ * - Choice/Rating questions: Frequency count per option
+ * - Text/Number questions: List of all responses with metadata
+ * 
+ * @example
+ * GET /reports/1?survey_id=10
+ * Response: {
+ *   "survey": { "id": 10, "title": "...", "total_responses": 50 },
+ *   "results": [
+ *     { "question": "...", "type": "single_choice", "breakdown": [{"option": "Yes", "count": 30}] }
+ *   ]
+ * }
+ */
 export const getCompanyReports = (c) => {
   try {
     const companyId = c.req.param('companyId');

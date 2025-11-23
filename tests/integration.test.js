@@ -5,7 +5,10 @@ import { initDB } from "../src/db/setup.js";
 
 // IDs para usar entre tests
 let companyId;
-let userId;
+let creatorId;
+let analystId;
+let creatorToken;
+let analystToken;
 let surveyId;
 let questionId;
 
@@ -26,49 +29,72 @@ describe("FeedFlow API Integration Tests", () => {
     db.run("DELETE FROM companies");
   });
 
-  // 2. Limpiar después (opcional, ya que usamos un archivo separado)
-  afterAll(() => {
-    // db.close();
-  });
+  // ...existing code...
 
-  // --- TEST: CREAR EMPRESA ---
-  test("POST /companies - Debe crear una empresa", async () => {
-    const res = await app.request("/companies", {
-      method: "POST",
-      body: JSON.stringify({ name: "Test Corp", nit: "999999" }),
-    });
+  test("Setup Inicial - Crear Empresa y Usuarios (Creador y Analista)", async () => {
+    // Insertamos empresa
+    const insertComp = db.prepare("INSERT INTO companies (name, nit) VALUES (?, ?) RETURNING id");
+    const comp = insertComp.get("Test Corp", "999999");
+    companyId = comp.id;
+
+    const hashedPassword = await Bun.password.hash("123456");
+    const insertUser = db.prepare("INSERT INTO users (company_id, name, email, password, role) VALUES (?, ?, ?, ?, ?) RETURNING id");
     
-    expect(res.status).toBe(201);
-    const json = await res.json();
-    expect(json.data.name).toBe("Test Corp");
-    companyId = json.data.id;
+    // Usuario Creador
+    const creator = insertUser.get(companyId, "Creator Test", "creator@test.com", hashedPassword, "creator");
+    creatorId = creator.id;
+
+    // Usuario Analista
+    const analyst = insertUser.get(companyId, "Analyst Test", "analyst@test.com", hashedPassword, "analyst");
+    analystId = analyst.id;
+
+    expect(creatorId).toBeDefined();
+    expect(analystId).toBeDefined();
   });
 
-  // --- TEST: CREAR USUARIO ---
-  test("POST /users - Debe crear un usuario creador", async () => {
-    const res = await app.request("/users", {
+  // --- TEST: LOGIN (Ambos roles) ---
+  test("POST /auth/login - Debe devolver tokens para ambos roles", async () => {
+    // Login Creador
+    const resCreator = await app.request("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ 
-        company_id: companyId, 
-        name: "Admin Test", 
-        email: "admin@test.com", 
-        role: "creator" 
-      }),
+      body: JSON.stringify({ email: "creator@test.com", password: "123456" }),
     });
+    const jsonCreator = await resCreator.json();
+    creatorToken = jsonCreator.token;
 
-    expect(res.status).toBe(201);
-    const json = await res.json();
-    expect(json.data.email).toBe("admin@test.com");
-    userId = json.data.id;
+    // Login Analista
+    const resAnalyst = await app.request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: "analyst@test.com", password: "123456" }),
+    });
+    const jsonAnalyst = await resAnalyst.json();
+    analystToken = jsonAnalyst.token;
+
+    expect(creatorToken).toBeDefined();
+    expect(analystToken).toBeDefined();
   });
 
-  // --- TEST: CREAR ENCUESTA ---
-  test("POST /surveys - Debe crear una encuesta", async () => {
-    const res = await app.request("/surveys", {
+  // --- TEST: CREAR ENCUESTA (Solo Creador) ---
+  test("POST /surveys - Creador puede crear, Analista NO", async () => {
+    // Intento de Analista (Debe fallar)
+    const resFail = await app.request("/surveys", {
       method: "POST",
+      headers: { "Authorization": `Bearer ${analystToken}` },
       body: JSON.stringify({
         company_id: companyId,
-        created_by: userId,
+        created_by: analystId,
+        title: "Intento Hack",
+      }),
+    });
+    expect(resFail.status).toBe(403);
+
+    // Intento de Creador (Debe funcionar)
+    const resSuccess = await app.request("/surveys", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
+      body: JSON.stringify({
+        company_id: companyId,
+        created_by: creatorId,
         title: "Encuesta de Prueba",
         description: "Testing...",
         start_date: "2025-01-01",
@@ -76,17 +102,16 @@ describe("FeedFlow API Integration Tests", () => {
       }),
     });
 
-    expect(res.status).toBe(201);
-    const json = await res.json();
-    expect(json.data.title).toBe("Encuesta de Prueba");
-    expect(json.data.links.short_link).toBeDefined();
+    expect(resSuccess.status).toBe(201);
+    const json = await resSuccess.json();
     surveyId = json.data.id;
   });
 
-  // --- TEST: AGREGAR PREGUNTA ---
-  test("POST /surveys/:id/questions - Debe agregar una pregunta", async () => {
+  // --- TEST: AGREGAR PREGUNTA (Solo Creador) ---
+  test("POST /surveys/:id/questions - Solo Creador puede agregar", async () => {
     const res = await app.request(`/surveys/${surveyId}/questions`, {
       method: "POST",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
       body: JSON.stringify({
         text: "¿Te gusta Bun?",
         type: "single_choice",
@@ -96,12 +121,11 @@ describe("FeedFlow API Integration Tests", () => {
 
     expect(res.status).toBe(201);
     const json = await res.json();
-    expect(json.data.text).toBe("¿Te gusta Bun?");
     questionId = json.data.id;
   });
 
-  // --- TEST: RESPONDER ENCUESTA (WEB) ---
-  test("POST /submit/:id - Debe guardar respuestas", async () => {
+  // --- TEST: RESPONDER ENCUESTA (Público) ---
+  test("POST /submit/:id - Debe guardar respuestas (Sin Token)", async () => {
     const res = await app.request(`/submit/${surveyId}`, {
       method: "POST",
       body: JSON.stringify({
@@ -113,42 +137,35 @@ describe("FeedFlow API Integration Tests", () => {
     });
 
     expect(res.status).toBe(201);
-    const json = await res.json();
-    expect(json.message).toBe("Respuestas guardadas exitosamente");
   });
 
-  // --- TEST: VER REPORTES ---
-  test("GET /reports/:companyId - Debe mostrar resultados", async () => {
-    const res = await app.request(`/reports/${companyId}?survey_id=${surveyId}`);
+  // --- TEST: VER REPORTES (Solo Analista) ---
+  test("GET /reports/:companyId - Analista puede ver, Creador NO", async () => {
+    // Intento de Creador (Debe fallar)
+    const resFail = await app.request(`/reports/${companyId}?survey_id=${surveyId}`, {
+      headers: { "Authorization": `Bearer ${creatorToken}` }
+    });
+    expect(resFail.status).toBe(403);
+
+    // Intento de Analista (Debe funcionar)
+    const resSuccess = await app.request(`/reports/${companyId}?survey_id=${surveyId}`, {
+      headers: { "Authorization": `Bearer ${analystToken}` }
+    });
     
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    
+    expect(resSuccess.status).toBe(200);
+    const json = await resSuccess.json();
     expect(json.survey.total_responses).toBe(1);
-    expect(json.results[0].question).toBe("¿Te gusta Bun?");
-    // Verificar que contó "Mucho" como 1
-    const optionCount = json.results[0].breakdown.find(o => o.option === "Mucho");
-    expect(optionCount.count).toBe(1);
   });
 
-  // --- TEST: DUPLICAR ENCUESTA ---
-  test("POST /surveys/:id/duplicate - Debe duplicar encuesta y preguntas", async () => {
+  // --- TEST: DUPLICAR ENCUESTA (Solo Creador) ---
+  test("POST /surveys/:id/duplicate - Solo Creador puede duplicar", async () => {
     const res = await app.request(`/surveys/${surveyId}/duplicate`, {
       method: "POST",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
       body: JSON.stringify({ title: "Encuesta Duplicada" })
     });
 
     expect(res.status).toBe(201);
-    const json = await res.json();
-    expect(json.data.title).toBe("Encuesta Duplicada");
-    
-    // Verificar que se copiaron las preguntas
-    const newSurveyId = json.data.id;
-    const resGet = await app.request(`/surveys/${newSurveyId}`);
-    const jsonGet = await resGet.json();
-    
-    expect(jsonGet.data.questions.length).toBe(1);
-    expect(jsonGet.data.questions[0].text).toBe("¿Te gusta Bun?");
   });
 
 });

@@ -1,5 +1,22 @@
+/**
+ * @fileoverview Company management controller
+ * @module controllers/companies
+ */
+
 import { db } from "../db/connection.js";
 
+/**
+ * Creates a new company in the database
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with created company data
+ * @throws {Error} If company name is missing or database constraint violated (e.g., duplicate NIT)
+ * 
+ * @example
+ * POST /companies
+ * Body: { "name": "Acme Corp", "nit": "900123456" }
+ * Response: { "data": { "id": 1, "name": "Acme Corp", "nit": "900123456" } }
+ */
 export const createCompany = async (c) => {
   try {
     // 1. Obtener los datos que envía el usuario (JSON)

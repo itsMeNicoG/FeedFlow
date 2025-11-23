@@ -1,5 +1,30 @@
+/**
+ * @fileoverview Database schema initialization
+ * @module db/setup
+ * @description
+ * Creates all tables with proper foreign keys and constraints.
+ * Can be run directly: `bun run src/db/setup.js`
+ */
+
 import { Database } from "bun:sqlite";
 
+/**
+ * Initializes the database schema with all required tables
+ * @param {Database} db - Bun SQLite database instance
+ * @returns {void}
+ * 
+ * @description
+ * Creates 7 tables in the following order:
+ * 1. companies - Root entity
+ * 2. users - With password hashing and role-based access
+ * 3. surveys - Linked to companies and created by users
+ * 4. questions - Survey questions with ordering
+ * 5. options - Answer choices for selection-based questions
+ * 6. responses - Response metadata (channel, respondent)
+ * 7. answers - Individual question answers
+ * 
+ * All foreign keys have CASCADE DELETE for referential integrity.
+ */
 export const initDB = (db) => {
   // Habilitar claves foráneas
   db.run("PRAGMA foreign_keys = ON;");
@@ -21,6 +46,7 @@ export const initDB = (db) => {
       company_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL, -- Nueva columna para la contraseña hasheada
       role TEXT CHECK(role IN ('creator', 'analyst')) NOT NULL,
       status TEXT CHECK(status IN ('active', 'inactive')) DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

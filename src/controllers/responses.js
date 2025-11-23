@@ -1,5 +1,32 @@
+/**
+ * @fileoverview Survey response submission controller - Handles web and WhatsApp channels
+ * @module controllers/responses
+ */
+
 import { db } from "../db/connection.js";
 
+/**
+ * Submits survey responses from web channel (public endpoint)
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with response ID
+ * @throws {Error} If survey not found or transaction fails
+ * 
+ * @description
+ * Creates a response record and stores all answers atomically.
+ * Handles array values (e.g., multiple choice) by joining with commas.
+ * 
+ * @example
+ * POST /submit/10
+ * Body: { 
+ *   "respondent_identifier": "user@example.com",
+ *   "answers": [
+ *     { "question_id": 5, "value": "Very satisfied" },
+ *     { "question_id": 6, "value": ["Option A", "Option B"] }
+ *   ]
+ * }
+ * Response: { "data": { "response_id": 123 } }
+ */
 export const submitResponse = async (c) => {
   try {
     const surveyId = c.req.param('surveyId');
@@ -53,6 +80,26 @@ export const submitResponse = async (c) => {
   }
 };
 
+/**
+ * Webhook endpoint for WhatsApp bot integration (simulated)
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with status and response ID
+ * @throws {Error} If payload validation fails or transaction fails
+ * 
+ * @description
+ * Simplified webhook that accepts pre-processed survey answers from WhatsApp.
+ * In production, this would implement state machine logic to handle conversational flow.
+ * 
+ * @example
+ * POST /webhook/whatsapp
+ * Body: { 
+ *   "from": "+573001234567",
+ *   "survey_id": 10,
+ *   "answers": [{ "question_id": 5, "value": "Excelente" }]
+ * }
+ * Response: { "status": "success", "response_id": 124 }
+ */
 export const webhookWhatsapp = async (c) => {
   try {
     // Simulamos que recibimos un payload de un proveedor de WhatsApp (ej: Twilio/Meta)

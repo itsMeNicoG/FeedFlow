@@ -1,8 +1,29 @@
+/**
+ * @fileoverview Survey management controller - CRUD operations and duplication
+ * @module controllers/surveys
+ */
+
 import { db } from "../db/connection.js";
 
-// Función auxiliar para generar un slug aleatorio (para el link corto)
+/**
+ * Generates a random alphanumeric slug for short links
+ * @returns {string} 8-character random string
+ * @private
+ */
 const generateSlug = () => Math.random().toString(36).substring(2, 10);
 
+/**
+ * Creates a new survey with generated short link and QR code
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with survey data including short link and QR code URL
+ * @throws {Error} If required fields are missing or database operation fails
+ * 
+ * @example
+ * POST /surveys
+ * Body: { "company_id": 1, "created_by": 5, "title": "Customer Satisfaction", "start_date": "2025-01-01" }
+ * Response: { "data": { "id": 10, "links": { "short_link": "...", "qr_code": "..." } } }
+ */
 export const createSurvey = async (c) => {
   try {
     const body = await c.req.json();
@@ -44,6 +65,16 @@ export const createSurvey = async (c) => {
   }
 };
 
+/**
+ * Retrieves all surveys for a given company
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON response with array of surveys ordered by creation date (newest first)
+ * @throws {Error} If company_id query parameter is missing
+ * 
+ * @example
+ * GET /surveys?company_id=1
+ * Response: { "data": [{ "id": 1, "title": "...", "created_at": "..." }] }
+ */
 export const getSurveys = (c) => {
   try {
     const company_id = c.req.query('company_id');
@@ -61,6 +92,16 @@ export const getSurveys = (c) => {
   }
 };
 
+/**
+ * Retrieves a survey by ID with all its questions and options
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON response with survey, questions nested with their options
+ * @throws {Error} If survey not found
+ * 
+ * @example
+ * GET /surveys/1
+ * Response: { "data": { "id": 1, "title": "...", "questions": [{ "id": 5, "text": "...", "options": [...] }] } }
+ */
 export const getSurveyById = (c) => {
   try {
     const id = c.req.param('id');
@@ -107,6 +148,12 @@ export const getSurveyById = (c) => {
   }
 };
 
+/**
+ * Deletes a survey and all related data (cascades to questions, options, responses)
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON confirmation message
+ * @throws {Error} If database operation fails
+ */
 export const deleteSurvey = (c) => {
   try {
     const id = c.req.param('id');
@@ -119,6 +166,23 @@ export const deleteSurvey = (c) => {
   }
 };
 
+/**
+ * Duplicates a survey including all questions and options (transactional)
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with new survey ID
+ * @throws {Error} If original survey not found or transaction fails
+ * 
+ * @description
+ * Accepts optional body parameters to override original survey properties:
+ * - title: New title (defaults to "[Original Title] (Copia)")
+ * - company_id, created_by, description, start_date, end_date: Override values
+ * 
+ * @example
+ * POST /surveys/1/duplicate
+ * Body: { "title": "Survey 2025 Q2" }
+ * Response: { "data": { "id": 15, "title": "Survey 2025 Q2" } }
+ */
 export const duplicateSurvey = async (c) => {
   try {
     const id = c.req.param('id');

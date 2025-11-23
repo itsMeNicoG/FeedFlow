@@ -1,12 +1,19 @@
 # Dependencies
 node_modules/
 
+# Build output (Production bundle)
+dist/
+
 # Database
 *.sqlite
 *.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
 
 # Environment variables
 .env
+.env.local
+.env.production
 
 # User Context (Requested to be ignored)
 Context/
@@ -14,3 +21,12 @@ Context/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

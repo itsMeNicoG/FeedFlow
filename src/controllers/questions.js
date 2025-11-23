@@ -1,5 +1,27 @@
+/**
+ * @fileoverview Question management controller
+ * @module controllers/questions
+ */
+
 import { db } from "../db/connection.js";
 
+/**
+ * Adds a new question to a survey with optional answer options
+ * @async
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Promise<Response>} JSON response with created question data
+ * @throws {Error} If validation fails or database transaction fails
+ * 
+ * @description
+ * Valid question types: 'text', 'number', 'single_choice', 'multiple_choice', 'rating'
+ * For choice-based questions, 'options' array is required.
+ * Uses database transaction to ensure atomicity.
+ * 
+ * @example
+ * POST /surveys/1/questions
+ * Body: { "text": "How satisfied are you?", "type": "rating", "options": ["1", "2", "3", "4", "5"] }
+ * Response: { "data": { "id": 20, "survey_id": 1, "text": "...", "options": [...] } }
+ */
 export const addQuestion = async (c) => {
   try {
     const surveyId = c.req.param('id');
@@ -54,6 +76,12 @@ export const addQuestion = async (c) => {
   }
 };
 
+/**
+ * Deletes a question and all its options (cascade)
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON confirmation message
+ * @throws {Error} If database operation fails
+ */
 export const deleteQuestion = (c) => {
   try {
     const id = c.req.param('questionId');
