@@ -1,14 +1,728 @@
-# Guía de Uso - Nuevas Funcionalidades FeedFlow API
+# FeedFlow API - Referencia Completa
 
-Esta guía proporciona ejemplos prácticos de cómo usar las nuevas funcionalidades implementadas en FeedFlow API v2.0.
+> **Documentación oficial para desarrolladores frontend**  
+> Versión: 2.0 | Última actualización: Noviembre 2025
+
+Esta guía contiene la documentación completa de todos los endpoints de FeedFlow API con ejemplos de request/response listos para usar.
 
 ---
 
-## 📋 Tabla de Contenidos
-1. [Modificar Encuestas](#1-modificar-encuestas)
-2. [Gestión de Usuarios](#2-gestión-de-usuarios)
-3. [Links Cortos Públicos](#3-links-cortos-públicos)
-4. [Exportar Reportes](#4-exportar-reportes)
+## 📋 Índice
+
+### Endpoints Públicos (Sin autenticación)
+1. [Acceso a Encuesta por Slug](#1-get-sslug)
+2. [Enviar Respuestas](#2-post-submitsurveyid)
+
+### Autenticación
+3. [Login](#3-post-authlogin)
+
+### Empresas
+4. [Crear Empresa](#4-post-companies)
+
+### Usuarios
+5. [Crear Usuario](#5-post-users)
+6. [Listar Usuarios](#6-get-users)
+7. [Cambiar Estado de Usuario](#7-patch-usersidstatus)
+
+### Encuestas (Protegido)
+8. [Listar Encuestas](#8-get-surveys)
+9. [Obtener Encuesta Específica](#9-get-surveysid)
+10. [Crear Encuesta](#10-post-surveys)
+11. [Modificar Encuesta](#11-put-surveysid)
+12. [Eliminar Encuesta](#12-delete-surveysid)
+13. [Duplicar Encuesta](#13-post-surveysidduplicate)
+14. [Agregar Pregunta a Encuesta](#14-post-surveysidquestions)
+
+### Reportes (Protegido - Analyst only)
+15. [Generar Reporte](#15-get-reportscompanyid)
+16. [Exportar Reporte a Excel](#16-get-reportscompanyidexportformatxlsx)
+17. [Exportar Reporte a PDF](#17-get-reportscompanyidexportformatpdf)
+
+---
+
+## 🌐 URL Base
+
+```
+http://localhost:3000
+```
+
+Para producción, reemplaza con tu dominio:
+```
+https://api.feedflow.com
+```
+
+---
+
+## 🔓 Endpoints Públicos
+
+### 1. GET /s/:slug
+
+Obtiene una encuesta por su slug único (link corto). No requiere autenticación.
+
+**URL**: `/s/{slug}`
+
+**Método**: `GET`
+
+**Parámetros de URL**:
+- `slug` (string, requerido): Identificador único de la encuesta (ej: `abc123def456`)
+
+**Headers**: Ninguno
+
+**Response 200 OK**:
+```json
+{
+  "survey": {
+    "id": 5,
+    "title": "Encuesta de Satisfacción 2025",
+    "description": "Queremos conocer tu opinión sobre nuestros servicios",
+    "start_date": "2025-01-01T00:00:00.000Z",
+    "end_date": "2025-12-31T23:59:59.000Z"
+  },
+  "questions": [
+    {
+      "id": 10,
+      "text": "¿Cómo calificarías nuestro servicio?",
+      "type": "single_choice",
+      "required": true,
+      "order_num": 1,
+      "options": [
+        {
+          "id": 25,
+          "text": "Excelente",
+          "order_num": 1
+        },
+        {
+          "id": 26,
+          "text": "Bueno",
+          "order_num": 2
+        },
+        {
+          "id": 27,
+          "text": "Regular",
+          "order_num": 3
+        },
+        {
+          "id": 28,
+          "text": "Malo",
+          "order_num": 4
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "text": "¿Cuál es tu nivel de satisfacción? (1-5)",
+      "type": "rating",
+      "required": true,
+      "order_num": 2,
+      "options": null
+    },
+    {
+      "id": 12,
+      "text": "Comentarios adicionales",
+      "type": "text",
+      "required": false,
+      "order_num": 3,
+      "options": null
+    }
+  ]
+}
+```
+
+**Errores**:
+
+404 Not Found:
+```json
+{
+  "error": "Encuesta no encontrada"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X GET http://localhost:3000/s/abc123def456
+```
+
+**Ejemplo JavaScript**:
+```javascript
+const slug = 'abc123def456';
+const response = await fetch(`http://localhost:3000/s/${slug}`);
+const data = await response.json();
+console.log(data.survey.title);
+console.log(data.questions);
+```
+
+**Ejemplo React**:
+```jsx
+function SurveyPublicView() {
+  const { slug } = useParams();
+  const [survey, setSurvey] = useState(null);
+  
+  useEffect(() => {
+    fetch(`http://localhost:3000/s/${slug}`)
+      .then(res => res.json())
+      .then(data => setSurvey(data))
+      .catch(err => console.error(err));
+  }, [slug]);
+  
+  return (
+    <div>
+      <h1>{survey?.survey.title}</h1>
+      {/* Renderizar preguntas */}
+    </div>
+  );
+}
+```
+
+---
+
+### 2. POST /submit/:surveyId
+
+Envía respuestas a una encuesta. No requiere autenticación.
+
+**URL**: `/submit/{surveyId}`
+
+**Método**: `POST`
+
+**Parámetros de URL**:
+- `surveyId` (integer, requerido): ID de la encuesta
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "responses": [
+    {
+      "question_id": 10,
+      "value": "Excelente"
+    },
+    {
+      "question_id": 11,
+      "value": "5"
+    },
+    {
+      "question_id": 12,
+      "value": "Muy buen servicio, seguir así"
+    }
+  ]
+}
+```
+
+**Campos del body**:
+- `responses` (array, requerido): Lista de respuestas
+  - `question_id` (integer, requerido): ID de la pregunta
+  - `value` (string, requerido): Respuesta del usuario
+
+**Response 201 Created**:
+```json
+{
+  "message": "Respuestas guardadas exitosamente",
+  "submission_id": 123
+}
+```
+
+**Errores**:
+
+400 Bad Request:
+```json
+{
+  "error": "Se requiere el array 'responses'"
+}
+```
+
+404 Not Found:
+```json
+{
+  "error": "Encuesta no encontrada"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X POST http://localhost:3000/submit/5 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "responses": [
+      {"question_id": 10, "value": "Excelente"},
+      {"question_id": 11, "value": "5"},
+      {"question_id": 12, "value": "Muy buen servicio"}
+    ]
+  }'
+```
+
+**Ejemplo JavaScript**:
+```javascript
+async function submitSurvey(surveyId, responses) {
+  const response = await fetch(`http://localhost:3000/submit/${surveyId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ responses })
+  });
+  
+  if (!response.ok) {
+    throw new Error('Error al enviar respuestas');
+  }
+  
+  return await response.json();
+}
+
+// Uso
+const responses = [
+  { question_id: 10, value: 'Excelente' },
+  { question_id: 11, value: '5' }
+];
+await submitSurvey(5, responses);
+```
+
+---
+
+## 🔐 Autenticación
+
+### 3. POST /auth/login
+
+Inicia sesión y obtiene un token JWT.
+
+**URL**: `/auth/login`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "email": "usuario@empresa.com",
+  "password": "password123"
+}
+```
+
+**Response 200 OK**:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoidXN1YXJpb0BlbXByZXNhLmNvbSIsInJvbGUiOiJjcmVhdG9yIiwiY29tcGFueUlkIjoxLCJpYXQiOjE2ODk2ODUyMDAsImV4cCI6MTY4OTc3MTYwMH0.signature",
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez",
+    "email": "usuario@empresa.com",
+    "role": "creator",
+    "company_id": 1
+  }
+}
+```
+
+**Errores**:
+
+400 Bad Request:
+```json
+{
+  "error": "Email y contraseña son requeridos"
+}
+```
+
+401 Unauthorized:
+```json
+{
+  "error": "Credenciales inválidas"
+}
+```
+
+403 Forbidden (usuario desactivado):
+```json
+{
+  "error": "Usuario desactivado. Contacta al administrador"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "usuario@empresa.com",
+    "password": "password123"
+  }'
+```
+
+**Ejemplo JavaScript**:
+```javascript
+async function login(email, password) {
+  const response = await fetch('http://localhost:3000/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, password })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error);
+  }
+  
+  const data = await response.json();
+  
+  // Guardar token en localStorage
+  localStorage.setItem('token', data.token);
+  localStorage.setItem('user', JSON.stringify(data.user));
+  
+  return data;
+}
+```
+
+**Nota**: El token expira en 24 horas. Guárdalo en localStorage o sessionStorage y inclúyelo en el header `Authorization: Bearer {token}` en todas las peticiones protegidas.
+
+---
+
+## 🏢 Empresas
+
+### 4. POST /companies
+
+Crea una nueva empresa.
+
+**URL**: `/companies`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "name": "Mi Empresa S.A.S."
+}
+```
+
+**Response 201 Created**:
+```json
+{
+  "message": "Empresa creada exitosamente",
+  "company": {
+    "id": 1,
+    "name": "Mi Empresa S.A.S.",
+    "created_at": "2025-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Errores**:
+
+400 Bad Request:
+```json
+{
+  "error": "El nombre de la empresa es requerido"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X POST http://localhost:3000/companies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Mi Empresa S.A.S."
+  }'
+```
+
+---
+
+## 👥 Usuarios
+
+### 5. POST /users
+
+Crea un nuevo usuario asociado a una empresa.
+
+**URL**: `/users`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "name": "Juan Pérez",
+  "email": "juan@empresa.com",
+  "password": "password123",
+  "role": "creator",
+  "company_id": 1
+}
+```
+
+**Campos**:
+- `name` (string, requerido): Nombre completo
+- `email` (string, requerido): Email único
+- `password` (string, requerido): Contraseña (se hasheará con Argon2)
+- `role` (string, requerido): `"creator"` o `"analyst"`
+- `company_id` (integer, requerido): ID de la empresa
+
+**Response 201 Created**:
+```json
+{
+  "message": "Usuario creado exitosamente",
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez",
+    "email": "juan@empresa.com",
+    "role": "creator",
+    "company_id": 1,
+    "active": true,
+    "created_at": "2025-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Errores**:
+
+400 Bad Request:
+```json
+{
+  "error": "Todos los campos son requeridos: name, email, password, role, company_id"
+}
+```
+
+400 Bad Request (rol inválido):
+```json
+{
+  "error": "Rol inválido. Debe ser 'creator' o 'analyst'"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X POST http://localhost:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Juan Pérez",
+    "email": "juan@empresa.com",
+    "password": "password123",
+    "role": "creator",
+    "company_id": 1
+  }'
+```
+
+---
+
+### 6. GET /users
+
+Lista todos los usuarios de una empresa. **Requiere autenticación**.
+
+**URL**: `/users?company_id={companyId}`
+
+**Método**: `GET`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Query Parameters**:
+- `company_id` (integer, requerido): ID de la empresa
+
+**Response 200 OK**:
+```json
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@empresa.com",
+      "role": "creator",
+      "active": true,
+      "company_id": 1,
+      "created_at": "2025-01-15T10:30:00.000Z"
+    },
+    {
+      "id": 2,
+      "name": "María García",
+      "email": "maria@empresa.com",
+      "role": "analyst",
+      "active": true,
+      "company_id": 1,
+      "created_at": "2025-01-16T14:20:00.000Z"
+    },
+    {
+      "id": 3,
+      "name": "Carlos López",
+      "email": "carlos@empresa.com",
+      "role": "creator",
+      "active": false,
+      "company_id": 1,
+      "created_at": "2025-01-17T09:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Nota**: Las contraseñas **nunca** se incluyen en la respuesta por seguridad.
+
+**Errores**:
+
+400 Bad Request:
+```json
+{
+  "error": "Se requiere el parámetro company_id"
+}
+```
+
+401 Unauthorized:
+```json
+{
+  "error": "Token inválido o expirado"
+}
+```
+
+403 Forbidden:
+```json
+{
+  "error": "No tienes permiso para ver usuarios de esta empresa"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X GET "http://localhost:3000/users?company_id=1" \
+  -H "Authorization: Bearer eyJhbGc..."
+```
+
+**Ejemplo JavaScript**:
+```javascript
+async function getUsers(companyId, token) {
+  const response = await fetch(
+    `http://localhost:3000/users?company_id=${companyId}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Error al obtener usuarios');
+  }
+  
+  const data = await response.json();
+  return data.users;
+}
+```
+
+---
+
+### 7. PATCH /users/:id/status
+
+Activa o desactiva un usuario. **Requiere autenticación**.
+
+**URL**: `/users/{userId}/status`
+
+**Método**: `PATCH`
+
+**Parámetros de URL**:
+- `userId` (integer, requerido): ID del usuario
+
+**Headers**:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "active": false
+}
+```
+
+**Campos**:
+- `active` (boolean, requerido): `true` para activar, `false` para desactivar
+
+**Response 200 OK**:
+```json
+{
+  "message": "Estado del usuario actualizado",
+  "user": {
+    "id": 3,
+    "name": "Carlos López",
+    "email": "carlos@empresa.com",
+    "role": "creator",
+    "active": false
+  }
+}
+```
+
+**Errores**:
+
+400 Bad Request:
+```json
+{
+  "error": "Se requiere el campo 'active' (true o false)"
+}
+```
+
+404 Not Found:
+```json
+{
+  "error": "Usuario no encontrado o no pertenece a esta empresa"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+# Desactivar usuario
+curl -X PATCH http://localhost:3000/users/3/status \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -H "Content-Type: application/json" \
+  -d '{"active": false}'
+
+# Reactivar usuario
+curl -X PATCH http://localhost:3000/users/3/status \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -H "Content-Type: application/json" \
+  -d '{"active": true}'
+```
+
+**Ejemplo JavaScript**:
+```javascript
+async function toggleUserStatus(userId, active, token) {
+  const response = await fetch(
+    `http://localhost:3000/users/${userId}/status`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ active })
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Error al cambiar estado del usuario');
+  }
+  
+  return await response.json();
+}
+
+// Desactivar usuario
+await toggleUserStatus(3, false, token);
+```
+
+---
+
+## 📊 Encuestas
+
+Todos los endpoints de encuestas requieren autenticación. Los endpoints marcados con **(Creator only)** solo pueden ser accedidos por usuarios con rol `creator`.
 
 ---
 
@@ -641,3 +1355,676 @@ Para más información o reportar issues:
 - **Email**: soporte@feedflow.com
 - **Documentación completa**: Ver `README.md`
 - **Changelog**: Ver `CHANGELOG.md`
+##  Encuestas
+
+Todos los endpoints de encuestas requieren autenticación. Los endpoints marcados con **(Creator only)** solo pueden ser accedidos por usuarios con rol `creator`.
+
+### 8. GET /surveys
+
+Lista todas las encuestas de una empresa. **Requiere autenticación**.
+
+**URL**: `/surveys?company_id={companyId}`
+
+**Método**: `GET`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Query Parameters**:
+- `company_id` (integer, requerido): ID de la empresa
+
+**Response 200 OK**:
+```json
+{
+  "surveys": [
+    {
+      "id": 1,
+      "title": "Encuesta de Satisfacción Q1 2025",
+      "description": "Evaluación trimestral de servicios",
+      "start_date": "2025-01-01T00:00:00.000Z",
+      "end_date": "2025-03-31T23:59:59.000Z",
+      "company_id": 1,
+      "slug": "abc123def456",
+      "created_at": "2025-01-10T08:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "title": "Encuesta de Clima Laboral",
+      "description": "Medición anual del ambiente de trabajo",
+      "start_date": "2025-01-15T00:00:00.000Z",
+      "end_date": "2025-12-31T23:59:59.000Z",
+      "company_id": 1,
+      "slug": "xyz789ghi012",
+      "created_at": "2025-01-12T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+**Ejemplo JavaScript**:
+```javascript
+async function getSurveys(companyId, token) {
+  const response = await fetch(
+    `http://localhost:3000/surveys?company_id=${companyId}`,
+    {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  );
+  return await response.json();
+}
+```
+
+---
+
+### 9. GET /surveys/:id
+
+Obtiene una encuesta específica con todas sus preguntas. **Requiere autenticación**.
+
+**URL**: `/surveys/{surveyId}`
+
+**Método**: `GET`
+
+**Parámetros de URL**:
+- `surveyId` (integer, requerido): ID de la encuesta
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Response 200 OK**:
+```json
+{
+  "id": 1,
+  "title": "Encuesta de Satisfacción Q1 2025",
+  "description": "Evaluación trimestral de servicios",
+  "start_date": "2025-01-01T00:00:00.000Z",
+  "end_date": "2025-03-31T23:59:59.000Z",
+  "company_id": 1,
+  "slug": "abc123def456",
+  "created_at": "2025-01-10T08:00:00.000Z",
+  "questions": [
+    {
+      "id": 1,
+      "text": "¿Cómo calificarías nuestro servicio?",
+      "type": "single_choice",
+      "required": true,
+      "order_num": 1,
+      "options": [
+        { "id": 1, "text": "Excelente", "order_num": 1 },
+        { "id": 2, "text": "Bueno", "order_num": 2 },
+        { "id": 3, "text": "Regular", "order_num": 3 },
+        { "id": 4, "text": "Malo", "order_num": 4 }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "¿Cuántos años llevas con nosotros?",
+      "type": "number",
+      "required": false,
+      "order_num": 2,
+      "options": null
+    }
+  ]
+}
+```
+
+---
+
+### 10. POST /surveys
+
+Crea una nueva encuesta. **Creator only**.
+
+**URL**: `/surveys`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "title": "Encuesta de Satisfacción 2025",
+  "description": "Evaluación anual de servicios",
+  "start_date": "2025-01-01T00:00:00Z",
+  "end_date": "2025-12-31T23:59:59Z",
+  "company_id": 1
+}
+```
+
+**Campos**:
+- `title` (string, requerido): Título de la encuesta
+- `description` (string, opcional): Descripción
+- `start_date` (string ISO 8601, requerido): Fecha de inicio
+- `end_date` (string ISO 8601, requerido): Fecha de fin
+- `company_id` (integer, requerido): ID de la empresa
+
+**Response 201 Created**:
+```json
+{
+  "message": "Encuesta creada exitosamente",
+  "survey": {
+    "id": 5,
+    "title": "Encuesta de Satisfacción 2025",
+    "description": "Evaluación anual de servicios",
+    "start_date": "2025-01-01T00:00:00.000Z",
+    "end_date": "2025-12-31T23:59:59.000Z",
+    "company_id": 1,
+    "slug": "k7m9p2q4r6s8",
+    "created_at": "2025-01-20T15:45:00.000Z"
+  }
+}
+```
+
+**Nota**: El `slug` se genera automáticamente y es único.
+
+**Errores**:
+
+403 Forbidden:
+```json
+{
+  "error": "Acceso denegado. Se requiere rol: creator"
+}
+```
+
+---
+
+### 11. PUT /surveys/:id
+
+Modifica una encuesta existente (solo título, descripción y fechas). **Creator only**.
+
+**URL**: `/surveys/{surveyId}`
+
+**Método**: `PUT`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body** (todos los campos opcionales, envía solo los que quieres actualizar):
+```json
+{
+  "title": "Nuevo título actualizado",
+  "description": "Nueva descripción",
+  "start_date": "2025-02-01T00:00:00Z",
+  "end_date": "2025-11-30T23:59:59Z"
+}
+```
+
+**Response 200 OK**:
+```json
+{
+  "message": "Encuesta actualizada",
+  "survey": {
+    "id": 5,
+    "title": "Nuevo título actualizado",
+    "description": "Nueva descripción",
+    "start_date": "2025-02-01T00:00:00.000Z",
+    "end_date": "2025-11-30T23:59:59.000Z",
+    "company_id": 1,
+    "slug": "k7m9p2q4r6s8"
+  }
+}
+```
+
+**Errores**:
+
+404 Not Found:
+```json
+{
+  "error": "Encuesta no encontrada o no pertenece a esta empresa"
+}
+```
+
+**Ejemplo JavaScript**:
+```javascript
+async function updateSurvey(surveyId, updates, token) {
+  const response = await fetch(
+    `http://localhost:3000/surveys/${surveyId}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updates)
+    }
+  );
+  return await response.json();
+}
+
+// Actualizar solo título
+await updateSurvey(5, { title: 'Nuevo título' }, token);
+```
+
+---
+
+### 12. DELETE /surveys/:id
+
+Elimina una encuesta y todas sus preguntas asociadas. **Creator only**.
+
+**URL**: `/surveys/{surveyId}`
+
+**Método**: `DELETE`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Response 200 OK**:
+```json
+{
+  "message": "Encuesta eliminada exitosamente"
+}
+```
+
+---
+
+### 13. POST /surveys/:id/duplicate
+
+Duplica una encuesta con todas sus preguntas y opciones. **Creator only**.
+
+**URL**: `/surveys/{surveyId}/duplicate`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body** (opcional):
+```json
+{
+  "new_title": "Copia - Encuesta de Satisfacción"
+}
+```
+
+Si no se proporciona `new_title`, se usará el título original con prefijo "Copia - ".
+
+**Response 201 Created**:
+```json
+{
+  "message": "Encuesta duplicada exitosamente",
+  "new_survey": {
+    "id": 6,
+    "title": "Copia - Encuesta de Satisfacción 2025",
+    "description": "Evaluación anual de servicios",
+    "start_date": "2025-01-01T00:00:00.000Z",
+    "end_date": "2025-12-31T23:59:59.000Z",
+    "company_id": 1,
+    "slug": "a1b2c3d4e5f6",
+    "created_at": "2025-01-21T09:15:00.000Z"
+  },
+  "questions_copied": 5
+}
+```
+
+---
+
+### 14. POST /surveys/:id/questions
+
+Agrega una nueva pregunta a una encuesta. **Creator only**.
+
+**URL**: `/surveys/{surveyId}/questions`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body para pregunta de selección**:
+```json
+{
+  "text": "¿Cuál es tu nivel de satisfacción?",
+  "type": "single_choice",
+  "required": true,
+  "options": [
+    "Muy satisfecho",
+    "Satisfecho",
+    "Neutral",
+    "Insatisfecho",
+    "Muy insatisfecho"
+  ]
+}
+```
+
+**Body para pregunta de texto/número/rating**:
+```json
+{
+  "text": "¿Cuál es tu edad?",
+  "type": "number",
+  "required": false
+}
+```
+
+**Tipos de pregunta válidos**:
+- `single_choice` - Opción única (requiere `options`)
+- `multiple_choice` - Múltiple selección (requiere `options`)
+- `rating` - Escala numérica (no requiere `options`)
+- `text` - Respuesta abierta (no requiere `options`)
+- `number` - Número (no requiere `options`)
+
+**Response 201 Created**:
+```json
+{
+  "message": "Pregunta agregada exitosamente",
+  "question": {
+    "id": 15,
+    "survey_id": 5,
+    "text": "¿Cuál es tu nivel de satisfacción?",
+    "type": "single_choice",
+    "required": true,
+    "order_num": 3
+  },
+  "options": [
+    { "id": 45, "text": "Muy satisfecho", "order_num": 1 },
+    { "id": 46, "text": "Satisfecho", "order_num": 2 },
+    { "id": 47, "text": "Neutral", "order_num": 3 },
+    { "id": 48, "text": "Insatisfecho", "order_num": 4 },
+    { "id": 49, "text": "Muy insatisfecho", "order_num": 5 }
+  ]
+}
+```
+
+---
+
+##  Reportes
+
+Todos los endpoints de reportes requieren autenticación y rol **Analyst**.
+
+### 15. GET /reports/:companyId
+
+Genera un reporte agregado para una encuesta específica. **Analyst only**.
+
+**URL**: `/reports/{companyId}?survey_id={surveyId}`
+
+**Método**: `GET`
+
+**Parámetros de URL**:
+- `companyId` (integer, requerido): ID de la empresa
+
+**Query Parameters**:
+- `survey_id` (integer, requerido): ID de la encuesta
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Response 200 OK**:
+```json
+{
+  "survey": {
+    "id": 5,
+    "title": "Encuesta de Satisfacción 2025",
+    "total_responses": 50
+  },
+  "results": [
+    {
+      "question_id": 10,
+      "question": "¿Cómo calificarías nuestro servicio?",
+      "type": "single_choice",
+      "breakdown": [
+        { "option": "Excelente", "count": 30 },
+        { "option": "Bueno", "count": 15 },
+        { "option": "Regular", "count": 5 },
+        { "option": "Malo", "count": 0 }
+      ]
+    },
+    {
+      "question_id": 11,
+      "question": "Comentarios adicionales",
+      "type": "text",
+      "data": [
+        {
+          "value": "Muy buen servicio, seguir así",
+          "submitted_at": "2025-01-15T10:30:00.000Z"
+        },
+        {
+          "value": "Excelente atención al cliente",
+          "submitted_at": "2025-01-16T14:20:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Descripción de campos**:
+- Para preguntas de tipo `single_choice`, `multiple_choice`, `rating`: se incluye `breakdown` con conteo por opción
+- Para preguntas tipo `text`, `number`: se incluye `data` con todas las respuestas y fechas
+
+---
+
+### 16. GET /reports/:companyId/export?format=xlsx
+
+Exporta un reporte a Excel. **Analyst only**.
+
+**URL**: `/reports/{companyId}/export?survey_id={surveyId}&format=xlsx`
+
+**Método**: `GET`
+
+**Query Parameters**:
+- `survey_id` (integer, requerido): ID de la encuesta
+- `format` (string, requerido): `"xlsx"`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Response 200 OK**:
+- **Content-Type**: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- **Content-Disposition**: `attachment; filename="reporte_{surveyId}_{timestamp}.xlsx"`
+- **Body**: Archivo binario Excel
+
+**Ejemplo JavaScript para descargar**:
+```javascript
+async function downloadExcel(companyId, surveyId, token) {
+  const response = await fetch(
+    `http://localhost:3000/reports/${companyId}/export?survey_id=${surveyId}&format=xlsx`,
+    {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Error al exportar');
+  }
+  
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reporte_${surveyId}_${Date.now()}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+```
+
+---
+
+### 17. GET /reports/:companyId/export?format=pdf
+
+Exporta un reporte a PDF. **Analyst only**.
+
+**URL**: `/reports/{companyId}/export?survey_id={surveyId}&format=pdf`
+
+**Método**: `GET`
+
+**Query Parameters**:
+- `survey_id` (integer, requerido): ID de la encuesta
+- `format` (string, requerido): `"pdf"`
+
+**Headers**:
+```
+Authorization: Bearer {token}
+```
+
+**Response 200 OK**:
+- **Content-Type**: `application/pdf`
+- **Content-Disposition**: `attachment; filename="reporte_{surveyId}_{timestamp}.pdf"`
+- **Body**: Archivo binario PDF
+
+**Ejemplo React**:
+```jsx
+function ExportButton({ companyId, surveyId, token }) {
+  const [loading, setLoading] = useState(false);
+  
+  const exportPDF = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `http://localhost:3000/reports/${companyId}/export?survey_id=${surveyId}&format=pdf`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reporte_${Date.now()}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Error al exportar: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <button onClick={exportPDF} disabled={loading}>
+      {loading ? 'Exportando...' : 'Descargar PDF'}
+    </button>
+  );
+}
+```
+
+---
+
+##  Autenticación y Seguridad
+
+### Headers Requeridos
+
+Todos los endpoints protegidos requieren el header:
+```
+Authorization: Bearer {token}
+```
+
+### Obtener el Token
+
+1. Llama a `POST /auth/login` con credenciales válidas
+2. Guarda el `token` en localStorage o sessionStorage
+3. Incluye el token en todas las peticiones protegidas
+
+```javascript
+// Guardar token después del login
+const loginData = await fetch('/auth/login', { /* ... */ });
+const { token } = await loginData.json();
+localStorage.setItem('token', token);
+
+// Usar token en peticiones
+const token = localStorage.getItem('token');
+fetch('/surveys?company_id=1', {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+```
+
+### Control de Acceso por Rol
+
+| Endpoint | Creator | Analyst | Público |
+|----------|---------|---------|---------|
+| POST /surveys |  |  |  |
+| PUT /surveys/:id |  |  |  |
+| DELETE /surveys/:id |  |  |  |
+| POST /surveys/:id/duplicate |  |  |  |
+| POST /surveys/:id/questions |  |  |  |
+| GET /reports/:companyId |  |  |  |
+| GET /reports/export |  |  |  |
+| GET /surveys |  |  |  |
+| GET /users |  |  |  |
+| PATCH /users/:id/status |  |  |  |
+| GET /s/:slug |  |  |  |
+| POST /submit/:id |  |  |  |
+
+---
+
+##  Manejo de Errores
+
+Todos los endpoints devuelven errores en formato JSON:
+
+```json
+{
+  "error": "Mensaje descriptivo del error"
+}
+```
+
+### Códigos de Estado HTTP
+
+- `200 OK` - Petición exitosa
+- `201 Created` - Recurso creado exitosamente
+- `400 Bad Request` - Parámetros inválidos o faltantes
+- `401 Unauthorized` - Token inválido, expirado o ausente
+- `403 Forbidden` - Usuario sin permisos (rol incorrecto o usuario desactivado)
+- `404 Not Found` - Recurso no encontrado
+- `500 Internal Server Error` - Error del servidor
+
+### Ejemplo de Manejo de Errores
+
+```javascript
+async function apiRequest(url, options = {}) {
+  try {
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Error desconocido');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error.message);
+    throw error;
+  }
+}
+
+// Uso
+try {
+  const surveys = await apiRequest(
+    'http://localhost:3000/surveys?company_id=1',
+    {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  );
+} catch (error) {
+  // Mostrar error al usuario
+  alert(error.message);
+}
+```
+
+---
+
+##  Soporte
+
+Para más información sobre el proyecto, ver **[README.md](./README.md)**.
+
+Para historial de cambios, ver **[CHANGELOG.md](./CHANGELOG.md)**.
