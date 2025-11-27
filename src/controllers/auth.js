@@ -61,10 +61,11 @@ export const login = async (c) => {
     }
 
     // 4. Generar Token (El "brazalete" del club)
-    // Incluimos el ID y el Rol en el token
+    // Incluimos el ID, Rol y Company ID en el token
     const payload = {
       id: user.id,
       role: user.role,
+      company_id: user.company_id,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // Expira en 24 horas
     };
 
@@ -76,7 +77,8 @@ export const login = async (c) => {
       user: {
         id: user.id,
         name: user.name,
-        role: user.role
+        role: user.role,
+        company_id: user.company_id
       }
     });
 

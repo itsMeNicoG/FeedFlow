@@ -12,6 +12,17 @@ let analystToken;
 let surveyId;
 let questionId;
 
+// Variables para tests de admin
+let adminCompanyId;
+let adminId;
+let adminToken;
+let secondCompanyId;
+let secondAdminToken;
+let createdUserId;
+
+// Variable para admin de Test Corp (tests originales)
+let testCorpAdminToken;
+
 describe("FeedFlow API Integration Tests", () => {
   
   // 1. Preparar la base de datos de prueba antes de empezar
@@ -29,9 +40,275 @@ describe("FeedFlow API Integration Tests", () => {
     db.run("DELETE FROM companies");
   });
 
+  // =====================================================
+  // TESTS DE REGISTRO Y ADMINISTRACIÓN DE USUARIOS
+  // =====================================================
+
+  test("POST /register - Debe registrar empresa + admin exitosamente", async () => {
+    const res = await app.request("/register", {
+      method: "POST",
+      body: JSON.stringify({
+        company_name: "Admin Test Corp",
+        nit: "888888888",
+        admin_name: "Super Admin",
+        admin_email: "admin@admintest.com",
+        admin_password: "admin123"
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    
+    expect(json.data.company).toBeDefined();
+    expect(json.data.admin).toBeDefined();
+    expect(json.data.admin.role).toBe("admin");
+    
+    adminCompanyId = json.data.company.id;
+    adminId = json.data.admin.id;
+  });
+
+  test("POST /register - Debe rechazar NIT duplicado", async () => {
+    const res = await app.request("/register", {
+      method: "POST",
+      body: JSON.stringify({
+        company_name: "Otra Empresa",
+        nit: "888888888", // Mismo NIT
+        admin_name: "Otro Admin",
+        admin_email: "otro@test.com",
+        admin_password: "123456"
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Ya existe una empresa");
+  });
+
+  test("POST /register - Debe rechazar email duplicado", async () => {
+    const res = await app.request("/register", {
+      method: "POST",
+      body: JSON.stringify({
+        company_name: "Empresa Nueva",
+        nit: "777777777",
+        admin_name: "Admin Nuevo",
+        admin_email: "admin@admintest.com", // Email ya usado
+        admin_password: "123456"
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Ya existe un usuario");
+  });
+
+  test("POST /register - Debe validar campos obligatorios", async () => {
+    const res = await app.request("/register", {
+      method: "POST",
+      body: JSON.stringify({
+        company_name: "Incompleta",
+        // Faltan campos
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /auth/login - Admin puede hacer login", async () => {
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ 
+        email: "admin@admintest.com", 
+        password: "admin123" 
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    
+    expect(json.token).toBeDefined();
+    expect(json.user.role).toBe("admin");
+    expect(json.user.company_id).toBe(adminCompanyId);
+    
+    adminToken = json.token;
+  });
+
+  test("POST /users - Admin puede crear usuarios para su empresa", async () => {
+    const res = await app.request("/users", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        name: "Usuario Creado",
+        email: "creado@admintest.com",
+        role: "creator",
+        password: "password123"
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    
+    expect(json.data.role).toBe("creator");
+    expect(json.data.status).toBe("active");
+    
+    createdUserId = json.data.id;
+  });
+
+  test("POST /users - Admin puede crear otro admin", async () => {
+    const res = await app.request("/users", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        name: "Segundo Admin",
+        email: "admin2@admintest.com",
+        role: "admin",
+        password: "password123"
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.role).toBe("admin");
+  });
+
+  test("POST /users - Rechaza rol inválido", async () => {
+    const res = await app.request("/users", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        name: "Usuario Malo",
+        email: "malo@test.com",
+        role: "superuser", // Rol inválido
+        password: "password123"
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /users - Usuario no-admin NO puede crear usuarios", async () => {
+    // Primero hacer login con el usuario creator que creamos
+    const loginRes = await app.request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ 
+        email: "creado@admintest.com", 
+        password: "password123" 
+      }),
+    });
+    const { token: creatorToken } = await loginRes.json();
+
+    // Intentar crear usuario (debe fallar)
+    const res = await app.request("/users", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${creatorToken}` },
+      body: JSON.stringify({
+        name: "Intento Fallido",
+        email: "fallido@test.com",
+        role: "analyst",
+        password: "password123"
+      }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  test("GET /users - Admin puede ver usuarios de su empresa", async () => {
+    const res = await app.request("/users", {
+      headers: { "Authorization": `Bearer ${adminToken}` }
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    
+    // Debe tener al menos 3 usuarios (admin original + creator + segundo admin)
+    expect(json.data.length).toBeGreaterThanOrEqual(3);
+    
+    // Todos deben ser de la misma empresa
+    json.data.forEach(user => {
+      expect(user.company_id).toBe(adminCompanyId);
+    });
+  });
+
+  test("GET /users - Usuario no-admin NO puede listar usuarios", async () => {
+    const loginRes = await app.request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ 
+        email: "creado@admintest.com", 
+        password: "password123" 
+      }),
+    });
+    const { token } = await loginRes.json();
+
+    const res = await app.request("/users", {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  test("PATCH /users/:id/status - Admin puede cambiar estado de usuario de su empresa", async () => {
+    const res = await app.request(`/users/${createdUserId}/status`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${adminToken}` },
+      body: JSON.stringify({ status: "inactive" })
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.status).toBe("inactive");
+
+    // Reactivar
+    await app.request(`/users/${createdUserId}/status`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${adminToken}` },
+      body: JSON.stringify({ status: "active" })
+    });
+  });
+
+  test("PATCH /users/:id/status - Admin NO puede modificar usuarios de otra empresa", async () => {
+    // Crear segunda empresa
+    const registerRes = await app.request("/register", {
+      method: "POST",
+      body: JSON.stringify({
+        company_name: "Segunda Empresa",
+        nit: "666666666",
+        admin_name: "Admin Segundo",
+        admin_email: "admin@segunda.com",
+        admin_password: "123456"
+      }),
+    });
+    const registerJson = await registerRes.json();
+    secondCompanyId = registerJson.data.company.id;
+
+    // Login con segundo admin
+    const loginRes = await app.request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ 
+        email: "admin@segunda.com", 
+        password: "123456" 
+      }),
+    });
+    const loginJson = await loginRes.json();
+    secondAdminToken = loginJson.token;
+
+    // Intentar modificar usuario de la primera empresa
+    const res = await app.request(`/users/${createdUserId}/status`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${secondAdminToken}` },
+      body: JSON.stringify({ status: "inactive" })
+    });
+
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain("otra empresa");
+  });
+
+  // =====================================================
+  // TESTS ORIGINALES (mantener compatibilidad)
+  // =====================================================
+
   // ...existing code...
 
-  test("Setup Inicial - Crear Empresa y Usuarios (Creador y Analista)", async () => {
+  test("Setup Inicial - Crear Empresa y Usuarios (Admin, Creador y Analista)", async () => {
     // Insertamos empresa
     const insertComp = db.prepare("INSERT INTO companies (name, nit) VALUES (?, ?) RETURNING id");
     const comp = insertComp.get("Test Corp", "999999");
@@ -39,6 +316,9 @@ describe("FeedFlow API Integration Tests", () => {
 
     const hashedPassword = await Bun.password.hash("123456");
     const insertUser = db.prepare("INSERT INTO users (company_id, name, email, password, role) VALUES (?, ?, ?, ?, ?) RETURNING id");
+    
+    // Usuario Admin para Test Corp
+    const admin = insertUser.get(companyId, "Admin Test", "admintestcorp@test.com", hashedPassword, "admin");
     
     // Usuario Creador
     const creator = insertUser.get(companyId, "Creator Test", "creator@test.com", hashedPassword, "creator");
@@ -48,12 +328,21 @@ describe("FeedFlow API Integration Tests", () => {
     const analyst = insertUser.get(companyId, "Analyst Test", "analyst@test.com", hashedPassword, "analyst");
     analystId = analyst.id;
 
+    expect(admin.id).toBeDefined();
     expect(creatorId).toBeDefined();
     expect(analystId).toBeDefined();
   });
 
-  // --- TEST: LOGIN (Ambos roles) ---
-  test("POST /auth/login - Debe devolver tokens para ambos roles", async () => {
+  // --- TEST: LOGIN (Todos los roles) ---
+  test("POST /auth/login - Debe devolver tokens para todos los roles", async () => {
+    // Login Admin de Test Corp
+    const resAdmin = await app.request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: "admintestcorp@test.com", password: "123456" }),
+    });
+    const jsonAdmin = await resAdmin.json();
+    testCorpAdminToken = jsonAdmin.token;
+
     // Login Creador
     const resCreator = await app.request("/auth/login", {
       method: "POST",
@@ -70,6 +359,7 @@ describe("FeedFlow API Integration Tests", () => {
     const jsonAnalyst = await resAnalyst.json();
     analystToken = jsonAnalyst.token;
 
+    expect(testCorpAdminToken).toBeDefined();
     expect(creatorToken).toBeDefined();
     expect(analystToken).toBeDefined();
   });
@@ -184,22 +474,22 @@ describe("FeedFlow API Integration Tests", () => {
     expect(json.data.title).toBe("Encuesta Modificada");
   });
 
-  // --- TEST: LISTAR USUARIOS ---
-  test("GET /users - Debe listar usuarios de la empresa", async () => {
-    const res = await app.request(`/users?company_id=${companyId}`, {
-      headers: { "Authorization": `Bearer ${creatorToken}` }
+  // --- TEST: LISTAR USUARIOS (Solo Admin) ---
+  test("GET /users - Admin puede listar usuarios de su empresa", async () => {
+    const res = await app.request(`/users`, {
+      headers: { "Authorization": `Bearer ${testCorpAdminToken}` }
     });
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data.length).toBe(2); // Creador y Analista
+    expect(json.data.length).toBe(3); // Admin, Creador y Analista
   });
 
-  // --- TEST: CAMBIAR ESTADO DE USUARIO ---
-  test("PATCH /users/:id/status - Debe cambiar estado del usuario", async () => {
+  // --- TEST: CAMBIAR ESTADO DE USUARIO (Solo Admin) ---
+  test("PATCH /users/:id/status - Admin puede cambiar estado del usuario", async () => {
     const res = await app.request(`/users/${analystId}/status`, {
       method: "PATCH",
-      headers: { "Authorization": `Bearer ${creatorToken}` },
+      headers: { "Authorization": `Bearer ${testCorpAdminToken}` },
       body: JSON.stringify({ status: "inactive" })
     });
 
@@ -210,7 +500,7 @@ describe("FeedFlow API Integration Tests", () => {
     // Reactivar para no romper otros tests
     await app.request(`/users/${analystId}/status`, {
       method: "PATCH",
-      headers: { "Authorization": `Bearer ${creatorToken}` },
+      headers: { "Authorization": `Bearer ${testCorpAdminToken}` },
       body: JSON.stringify({ status: "active" })
     });
   });

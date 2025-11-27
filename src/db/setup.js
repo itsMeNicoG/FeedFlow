@@ -39,7 +39,7 @@ export const initDB = (db) => {
     );
   `);
 
-  // 2. Tabla de Usuarios (Creadores y Analistas)
+  // 2. Tabla de Usuarios (Admin, Creadores y Analistas)
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,7 @@ export const initDB = (db) => {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL, -- Nueva columna para la contraseña hasheada
-      role TEXT CHECK(role IN ('creator', 'analyst')) NOT NULL,
+      role TEXT CHECK(role IN ('admin', 'creator', 'analyst')) NOT NULL,
       status TEXT CHECK(status IN ('active', 'inactive')) DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE

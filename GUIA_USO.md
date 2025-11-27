@@ -281,6 +281,77 @@ await submitSurvey(5, responses);
 
 ---
 
+### 3. POST /register  (Público — Bootstrap de Empresa + Admin)
+
+Permite que una nueva empresa se registre junto con su primer usuario administrador. Este endpoint es público y **solo** funcionará si el NIT enviado no existe aún en la base de datos (evita duplicados y bootstrap no autorizado).
+
+**URL**: `/register`
+
+**Método**: `POST`
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "company_name": "Mi Empresa S.A.",
+  "nit": "900123456",
+  "admin_name": "Juan Admin",
+  "admin_email": "admin@miempresa.com",
+  "admin_password": "ContraseñaSegura123!"
+}
+```
+
+**Notas**:
+- Si ya existe una empresa con el mismo `nit`, el servidor retornará `409 Conflict`.
+- Si el `email` del admin ya está en uso, el servidor retorna `409 Conflict`.
+- Este endpoint crea **dos recursos** en una sola operación: la fila en `companies` y la fila en `users` con rol `admin`.
+
+**Response 201 Created**:
+```json
+{
+  "message": "Empresa y administrador creados exitosamente",
+  "data": {
+    "company": { "id": 10, "name": "Mi Empresa S.A.", "nit": "900123456" },
+    "admin": { "id": 42, "name": "Juan Admin", "email": "admin@miempresa.com", "role": "admin", "status": "active" }
+  }
+}
+```
+
+**Errores**:
+
+409 Conflict:
+```json
+{
+  "error": "Ya existe una empresa registrada con este NIT"
+}
+```
+
+400 Bad Request:
+```json
+{
+  "error": "Faltan campos obligatorios"
+}
+```
+
+**Ejemplo cURL**:
+```bash
+curl -X POST http://localhost:3000/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company_name": "Mi Empresa S.A.",
+    "nit": "900123456",
+    "admin_name": "Juan Admin",
+    "admin_email": "admin@miempresa.com",
+    "admin_password": "ContraseñaSegura123!"
+  }'
+```
+
+---
+
 ## 🔐 Autenticación
 
 ### 3. POST /auth/login
@@ -436,10 +507,9 @@ curl -X POST http://localhost:3000/companies \
 ---
 
 ## 👥 Usuarios
+### 5. POST /users (Admin only)
 
-### 5. POST /users
-
-Crea un nuevo usuario asociado a una empresa.
+Ahora la creación de usuarios es una operación **administrativa**: solo usuarios con el rol `admin` pueden crear nuevos usuarios para su propia empresa.
 
 **URL**: `/users`
 
@@ -447,6 +517,7 @@ Crea un nuevo usuario asociado a una empresa.
 
 **Headers**:
 ```
+Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
@@ -456,17 +527,13 @@ Content-Type: application/json
   "name": "Juan Pérez",
   "email": "juan@empresa.com",
   "password": "password123",
-  "role": "creator",
-  "company_id": 1
+  "role": "creator"
 }
 ```
 
-**Campos**:
-- `name` (string, requerido): Nombre completo
-- `email` (string, requerido): Email único
-- `password` (string, requerido): Contraseña (se hasheará con Argon2)
-- `role` (string, requerido): `"creator"` o `"analyst"`
-- `company_id` (integer, requerido): ID de la empresa
+**Notas**:
+- El `company_id` NO se envía en el body: el servidor toma la empresa del `JWT` del admin autenticado.
+- Roles válidos: `admin`, `creator`, `analyst`.
 
 **Response 201 Created**:
 ```json
@@ -478,7 +545,7 @@ Content-Type: application/json
     "email": "juan@empresa.com",
     "role": "creator",
     "company_id": 1,
-    "active": true,
+    "status": "active",
     "created_at": "2025-01-15T10:30:00.000Z"
   }
 }
@@ -486,40 +553,47 @@ Content-Type: application/json
 
 **Errores**:
 
-400 Bad Request:
+401 Unauthorized:
 ```json
 {
-  "error": "Todos los campos son requeridos: name, email, password, role, company_id"
+  "error": "Token inválido o ausente"
+}
+```
+
+403 Forbidden:
+```json
+{
+  "error": "Acceso denegado. Se requiere el rol de 'admin'"
 }
 ```
 
 400 Bad Request (rol inválido):
 ```json
 {
-  "error": "Rol inválido. Debe ser 'creator' o 'analyst'"
+  "error": "Rol inválido. Debe ser 'admin', 'creator' o 'analyst'"
 }
 ```
 
 **Ejemplo cURL**:
 ```bash
 curl -X POST http://localhost:3000/users \
+  -H "Authorization: Bearer <token_admin>" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Juan Pérez",
     "email": "juan@empresa.com",
     "password": "password123",
-    "role": "creator",
-    "company_id": 1
+    "role": "creator"
   }'
 ```
 
 ---
 
-### 6. GET /users
+### 6. GET /users (Admin only)
 
-Lista todos los usuarios de una empresa. **Requiere autenticación**.
+Lista todos los usuarios de la empresa del admin autenticado. Este endpoint **requiere** que el solicitante tenga rol `admin`.
 
-**URL**: `/users?company_id={companyId}`
+**URL**: `/users`
 
 **Método**: `GET`
 
@@ -528,54 +602,28 @@ Lista todos los usuarios de una empresa. **Requiere autenticación**.
 Authorization: Bearer {token}
 ```
 
-**Query Parameters**:
-- `company_id` (integer, requerido): ID de la empresa
-
 **Response 200 OK**:
 ```json
 {
-  "users": [
+  "data": [
     {
       "id": 1,
       "name": "Juan Pérez",
       "email": "juan@empresa.com",
       "role": "creator",
-      "active": true,
+      "status": "active",
       "company_id": 1,
       "created_at": "2025-01-15T10:30:00.000Z"
-    },
-    {
-      "id": 2,
-      "name": "María García",
-      "email": "maria@empresa.com",
-      "role": "analyst",
-      "active": true,
-      "company_id": 1,
-      "created_at": "2025-01-16T14:20:00.000Z"
-    },
-    {
-      "id": 3,
-      "name": "Carlos López",
-      "email": "carlos@empresa.com",
-      "role": "creator",
-      "active": false,
-      "company_id": 1,
-      "created_at": "2025-01-17T09:00:00.000Z"
     }
   ]
 }
 ```
 
-**Nota**: Las contraseñas **nunca** se incluyen en la respuesta por seguridad.
+**Notas**:
+- El `company_id` se obtiene del `JWT` del admin; no se acepta `company_id` por query.
+- Solo devuelve usuarios pertenecientes a la misma empresa del admin.
 
 **Errores**:
-
-400 Bad Request:
-```json
-{
-  "error": "Se requiere el parámetro company_id"
-}
-```
 
 401 Unauthorized:
 ```json
@@ -587,34 +635,7 @@ Authorization: Bearer {token}
 403 Forbidden:
 ```json
 {
-  "error": "No tienes permiso para ver usuarios de esta empresa"
-}
-```
-
-**Ejemplo cURL**:
-```bash
-curl -X GET "http://localhost:3000/users?company_id=1" \
-  -H "Authorization: Bearer eyJhbGc..."
-```
-
-**Ejemplo JavaScript**:
-```javascript
-async function getUsers(companyId, token) {
-  const response = await fetch(
-    `http://localhost:3000/users?company_id=${companyId}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    }
-  );
-  
-  if (!response.ok) {
-    throw new Error('Error al obtener usuarios');
-  }
-  
-  const data = await response.json();
-  return data.users;
+  "error": "Acceso denegado. Se requiere el rol de 'admin'"
 }
 ```
 
@@ -1260,12 +1281,12 @@ Los siguientes endpoints **NO requieren autenticación**:
 
 ### RBAC (Control de Acceso Basado en Roles)
 
-| Endpoint                      | Creator | Analyst |
-|-------------------------------|---------|---------|
-| `PUT /surveys/:id`            | ✅      | ❌      |
-| `GET /users`                  | ✅      | ✅      |
-| `PATCH /users/:id/status`     | ✅      | ✅      |
-| `GET /reports/export`         | ❌      | ✅      |
+| Endpoint                      | Admin | Creator | Analyst |
+|-------------------------------|:-----:|:-------:|:-------:|
+| `PUT /surveys/:id`            | ❌    | ✅      | ❌      |
+| `GET /users`                  | ✅    | ❌      | ❌      |
+| `PATCH /users/:id/status`     | ✅    | ❌      | ❌      |
+| `GET /reports/:companyId`     | ❌    | ❌      | ✅      |
 
 ---
 
@@ -1951,20 +1972,20 @@ fetch('/surveys?company_id=1', {
 
 ### Control de Acceso por Rol
 
-| Endpoint | Creator | Analyst | Público |
-|----------|---------|---------|---------|
-| POST /surveys |  |  |  |
-| PUT /surveys/:id |  |  |  |
-| DELETE /surveys/:id |  |  |  |
-| POST /surveys/:id/duplicate |  |  |  |
-| POST /surveys/:id/questions |  |  |  |
-| GET /reports/:companyId |  |  |  |
-| GET /reports/export |  |  |  |
-| GET /surveys |  |  |  |
-| GET /users |  |  |  |
-| PATCH /users/:id/status |  |  |  |
-| GET /s/:slug |  |  |  |
-| POST /submit/:id |  |  |  |
+| Endpoint | Admin | Creator | Analyst | Público |
+|----------|:-----:|:-------:|:-------:|:------:|
+| POST /surveys | ❌ | ✅ | ❌ | ❌ |
+| PUT /surveys/:id | ❌ | ✅ | ❌ | ❌ |
+| DELETE /surveys/:id | ❌ | ✅ | ❌ | ❌ |
+| POST /surveys/:id/duplicate | ❌ | ✅ | ❌ | ❌ |
+| POST /surveys/:id/questions | ❌ | ✅ | ❌ | ❌ |
+| GET /reports/:companyId | ❌ | ❌ | ✅ | ❌ |
+| GET /reports/:companyId/export | ❌ | ❌ | ✅ | ❌ |
+| GET /surveys | ❌ | ✅ | ✅ | ❌ |
+| GET /users | ✅ | ❌ | ❌ | ❌ |
+| PATCH /users/:id/status | ✅ | ❌ | ❌ | ❌ |
+| GET /s/:slug | ❌ | ❌ | ❌ | ✅ |
+| POST /submit/:id | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -2028,3 +2049,18 @@ try {
 Para más información sobre el proyecto, ver **[README.md](./README.md)**.
 
 Para historial de cambios, ver **[CHANGELOG.md](./CHANGELOG.md)**.
+
+## ✅ Pruebas (Tests)
+
+Se agregaron pruebas de integración que cubren el nuevo flujo de registro y las restricciones por rol (admin). Archivo principal de tests:
+
+- `tests/integration.test.js`
+
+Comando para ejecutar las pruebas (usa Bun):
+
+```powershell
+cd "c:\Users\nico2\OneDrive - Politécnico Grancolombiano\2025-2\Desarrollo de software en equipo\Entrega 3\FeedFlow\Backend"
+bun test
+```
+
+En mi ejecución local las pruebas de integración pasaron todas: `26 passed, 0 failed`.
