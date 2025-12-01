@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow - Responder Encuesta</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+</head>
+
+<body>
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+    </header>
+
+    <main>
+        <div class="contenido-principal contenedor">
+            <h2 id="tituloEncuesta">Cargando encuesta...</h2>
+            <p id="descripcionEncuesta"></p>
+
+            <form id="formEncuesta" class="formulario">
+                <fieldset id="contenedorPreguntas">
+                    <!-- Las preguntas se cargarán dinámicamente aquí -->
+                </fieldset>
+
+                <input class="btn" type="submit" value="Enviar Respuestas">
+            </form>
+
+            <div id="mensajeExito" style="display: none; padding: 1rem; background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; border-radius: 5px; margin-top: 1rem;">
+                <p>¡Gracias por responder la encuesta!</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000';
+        let surveyId = null;
+        let surveySlug = null;
+
+        // Obtener el slug de la encuesta de la URL
+        function getSurveySlugFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('slug');
+        }
+
+        // Cargar la encuesta y sus preguntas
+        async function cargarEncuesta() {
+            surveySlug = getSurveySlugFromURL();
+
+            if (!surveySlug) {
+                alert('No se especificó una encuesta válida.');
+                return;
+            }
+
+            try {
+                // Usar el endpoint público /s/:slug
+                const response = await fetch(`${API_BASE_URL}/s/${surveySlug}`, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al cargar la encuesta');
+                }
+
+                const data = await response.json();
+                const survey = data.data;
+
+                // Guardar el ID de la encuesta para enviar las respuestas
+                surveyId = survey.id;
+
+                // Actualizar título y descripción
+                document.getElementById('tituloEncuesta').textContent = survey.title;
+                document.getElementById('descripcionEncuesta').textContent = survey.description || '';
+
+                // Renderizar preguntas
+                renderizarPreguntas(survey.questions);
+
+            } catch (error) {
+                console.error('Error al cargar encuesta:', error);
+                alert('No se pudo cargar la encuesta. Verifica que el enlace sea correcto.');
+            }
+        }
+
+        // Renderizar las preguntas dinámicamente
+        function renderizarPreguntas(questions) {
+            const contenedor = document.getElementById('contenedorPreguntas');
+            contenedor.innerHTML = '';
+
+            if (!questions || questions.length === 0) {
+                contenedor.innerHTML = '<p>Esta encuesta no tiene preguntas configuradas.</p>';
+                return;
+            }
+
+            questions.forEach((question, index) => {
+                const campoPregunta = document.createElement('div');
+                campoPregunta.className = 'campo';
+                campoPregunta.dataset.questionId = question.id;
+                campoPregunta.dataset.questionType = question.type;
+
+                const label = document.createElement('label');
+                label.textContent = `${index + 1}. ${question.text}`;
+                campoPregunta.appendChild(label);
+
+                // Crear campo de respuesta según el tipo
+                switch (question.type) {
+                    case 'text':
+                        const inputTexto = document.createElement('input');
+                        inputTexto.type = 'text';
+                        inputTexto.className = 'respuesta-texto';
+                        inputTexto.placeholder = 'Tu respuesta';
+                        inputTexto.required = true;
+                        campoPregunta.appendChild(inputTexto);
+                        break;
+
+                    case 'number':
+                        const inputNumero = document.createElement('input');
+                        inputNumero.type = 'number';
+                        inputNumero.className = 'respuesta-numero';
+                        inputNumero.placeholder = 'Tu respuesta';
+                        inputNumero.required = true;
+                        campoPregunta.appendChild(inputNumero);
+                        break;
+
+                    case 'date':
+                        const inputFecha = document.createElement('input');
+                        inputFecha.type = 'date';
+                        inputFecha.className = 'respuesta-fecha';
+                        inputFecha.required = true;
+                        campoPregunta.appendChild(inputFecha);
+                        break;
+
+                    case 'single_choice':
+                        if (question.options && question.options.length > 0) {
+                            question.options.forEach(option => {
+                                const divOpcion = document.createElement('div');
+                                divOpcion.style.marginLeft = '1rem';
+                                
+                                const radio = document.createElement('input');
+                                radio.type = 'radio';
+                                radio.name = `pregunta-${question.id}`;
+                                radio.value = option.value || option.text;
+                                radio.id = `opcion-${option.id}`;
+                                radio.required = true;
+
+                                const labelOpcion = document.createElement('label');
+                                labelOpcion.htmlFor = `opcion-${option.id}`;
+                                labelOpcion.textContent = option.text;
+                                labelOpcion.style.marginLeft = '0.5rem';
+
+                                divOpcion.appendChild(radio);
+                                divOpcion.appendChild(labelOpcion);
+                                campoPregunta.appendChild(divOpcion);
+                            });
+                        }
+                        break;
+
+                    case 'multiple_choice':
+                        if (question.options && question.options.length > 0) {
+                            question.options.forEach(option => {
+                                const divOpcion = document.createElement('div');
+                                divOpcion.style.marginLeft = '1rem';
+                                
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.name = `pregunta-${question.id}`;
+                                checkbox.value = option.value || option.text;
+                                checkbox.id = `opcion-${option.id}`;
+                                checkbox.className = 'respuesta-multiple';
+
+                                const labelOpcion = document.createElement('label');
+                                labelOpcion.htmlFor = `opcion-${option.id}`;
+                                labelOpcion.textContent = option.text;
+                                labelOpcion.style.marginLeft = '0.5rem';
+
+                                divOpcion.appendChild(checkbox);
+                                divOpcion.appendChild(labelOpcion);
+                                campoPregunta.appendChild(divOpcion);
+                            });
+                        }
+                        break;
+
+                    case 'rating':
+                        const divRating = document.createElement('div');
+                        divRating.style.marginLeft = '1rem';
+                        
+                        for (let i = 1; i <= 5; i++) {
+                            const radio = document.createElement('input');
+                            radio.type = 'radio';
+                            radio.name = `pregunta-${question.id}`;
+                            radio.value = i;
+                            radio.id = `rating-${question.id}-${i}`;
+                            radio.required = true;
+
+                            const labelRating = document.createElement('label');
+                            labelRating.htmlFor = `rating-${question.id}-${i}`;
+                            labelRating.textContent = i;
+                            labelRating.style.marginLeft = '0.5rem';
+                            labelRating.style.marginRight = '1rem';
+
+                            divRating.appendChild(radio);
+                            divRating.appendChild(labelRating);
+                        }
+                        
+                        campoPregunta.appendChild(divRating);
+                        break;
+
+                    default:
+                        const inputDefault = document.createElement('input');
+                        inputDefault.type = 'text';
+                        inputDefault.className = 'respuesta-texto';
+                        inputDefault.placeholder = 'Tu respuesta';
+                        inputDefault.required = true;
+                        campoPregunta.appendChild(inputDefault);
+                }
+
+                contenedor.appendChild(campoPregunta);
+            });
+        }
+
+        // Recopilar respuestas del formulario
+        function recopilarRespuestas() {
+            const respuestas = [];
+            const preguntas = document.querySelectorAll('#contenedorPreguntas > div[data-question-id]');
+
+            for (const pregunta of preguntas) {
+                const questionId = parseInt(pregunta.dataset.questionId);
+                const questionType = pregunta.dataset.questionType;
+                let valor = null;
+
+                switch (questionType) {
+                    case 'text':
+                    case 'number':
+                        const inputTexto = pregunta.querySelector('.respuesta-texto, .respuesta-numero');
+                        valor = inputTexto ? inputTexto.value : '';
+                        break;
+
+                    case 'date':
+                        const inputFecha = pregunta.querySelector('.respuesta-fecha');
+                        valor = inputFecha ? inputFecha.value : '';
+                        break;
+
+                    case 'single_choice':
+                    case 'rating':
+                        const radioSeleccionado = pregunta.querySelector('input[type="radio"]:checked');
+                        valor = radioSeleccionado ? radioSeleccionado.value : '';
+                        break;
+
+                    case 'multiple_choice':
+                        const checkboxes = pregunta.querySelectorAll('input[type="checkbox"]:checked');
+                        valor = Array.from(checkboxes).map(cb => cb.value);
+                        break;
+
+                    default:
+                        const inputDefault = pregunta.querySelector('input');
+                        valor = inputDefault ? inputDefault.value : '';
+                }
+
+                if (valor !== null && valor !== '' && !(Array.isArray(valor) && valor.length === 0)) {
+                    respuestas.push({
+                        question_id: questionId,
+                        value: valor
+                    });
+                }
+            }
+
+            return respuestas;
+        }
+
+        // Enviar respuestas al servidor
+        async function enviarRespuestas(event) {
+            event.preventDefault();
+
+            const respuestas = recopilarRespuestas();
+
+            if (respuestas.length === 0) {
+                alert('Por favor, responde al menos una pregunta.');
+                return;
+            }
+
+            const payload = {
+                answers: respuestas
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/submit/${surveyId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Error al enviar respuestas');
+                }
+
+                const data = await response.json();
+                
+                // Mostrar mensaje de éxito
+                document.getElementById('formEncuesta').style.display = 'none';
+                document.getElementById('mensajeExito').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error al enviar respuestas:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Eventos
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarEncuesta();
+            document.getElementById('formEncuesta').addEventListener('submit', enviarRespuestas);
+        });
+    </script>
+
+</body>
+
+</html>

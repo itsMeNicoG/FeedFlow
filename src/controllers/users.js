@@ -42,7 +42,10 @@ export const createUser = async (c) => {
     }
 
     // Hashear la contraseña usando la función nativa de Bun
-    const hashedPassword = await Bun.password.hash(password);
+    const hashedPassword = await Bun.password.hash(password, {
+      algorithm: "bcrypt",
+      cost: 10
+    });
 
     // Insertar usuario (por defecto status es 'active')
     const query = db.query(`
@@ -179,7 +182,10 @@ export const registerCompanyAdmin = async (c) => {
     const company = companyQuery.get(company_name, nit);
 
     // Hashear la contraseña
-    const hashedPassword = await Bun.password.hash(admin_password);
+    const hashedPassword = await Bun.password.hash(admin_password, {
+      algorithm: "bcrypt",
+      cost: 10
+    });
 
     // Crear el usuario admin
     const userQuery = db.query(`

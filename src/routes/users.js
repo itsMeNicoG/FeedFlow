@@ -5,7 +5,7 @@
 
 import { Hono } from 'hono';
 import { createUser, getUsers, updateUserStatus } from '../controllers/users.js';
-import { requireRole } from '../middleware/auth.js';
+import { authMiddleware, checkUserActive, requireRole } from '../middleware/auth.js';
 
 const app = new Hono();
 
@@ -14,14 +14,14 @@ const app = new Hono();
  * @description Only users with 'admin' role can create new users for their company
  * @see {@link module:controllers/users~createUser}
  */
-app.post('/', requireRole('admin'), createUser);
+app.post('/', authMiddleware, checkUserActive, requireRole('admin'), createUser);
 
 /**
  * GET /users - List all users for the admin's company (Admin only)
  * @description Returns all users belonging to the authenticated admin's company
  * @see {@link module:controllers/users~getUsers}
  */
-app.get('/', requireRole('admin'), getUsers);
+app.get('/', authMiddleware, checkUserActive, requireRole('admin'), getUsers);
 
 /**
  * PATCH /users/:id/status - Update user status (Admin only)
@@ -29,6 +29,6 @@ app.get('/', requireRole('admin'), getUsers);
  * @description Only admins can change status, and only for users in their company
  * @see {@link module:controllers/users~updateUserStatus}
  */
-app.patch('/:id/status', requireRole('admin'), updateUserStatus);
+app.patch('/:id/status', authMiddleware, checkUserActive, requireRole('admin'), updateUserStatus);
 
 export default app;

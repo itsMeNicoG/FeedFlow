@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow-Inicio</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+    <script src="JS/auth.js"></script>
+    <script src="JS/navigation.js"></script>
+
+</head>
+
+<body>
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+        <button onclick="cerrarSesion()" style="position: absolute; right: 20px; top: 20px; padding: 10px 20px; background-color: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Cerrar Sesión</button>
+    </header>
+
+    <div class="contenedor-navegacion">
+      <nav class="nav-principal  contenedor">
+        <li><a class="enlacenav" href="MenuPrincipal.html">Inicio</a> </li>
+        <li id="menu-usuarios" style="display: none;"> <a href="#">Gestión de usuarios</a>  
+        <ul>
+            <li> <a href="CrearUsuarios.html">Crear usuarios</a>
+            <li> <a href="Consultarusuarios.html">Consultar, editar y eliminar</a>
+        </ul>       
+        </li>
+         <li id="menu-encuestas" style="display: none;"> <a href="#">Gestión encuestas</a>  
+        <ul>
+            <li> <a href="CrearEncuestas.html">Crear encuestas</a>
+            <li> <a href="ConsultarEncuestas.html">Consultar, editar y eliminar encuestas</a>
+        </ul>       
+        </li>
+         <li id="menu-reportes" style="display: none;"> <a href="Reportes.html">Reportes</a></li>
+        
+</nav>
+
+<main>
+    <div class="contenido-principal contenedor">
+
+        
+     <div class="hero">    </div>
+    
+        <div class="pagos">
+                <input class="btn pagos" type="submit" value="Suscripción Empresas"> </p>
+                <input class="btn pagos" type="submit" value="Suscripción Personal"> </p>
+        </div>
+
+
+<div class="titulo">
+   
+        <h2>Crea tus propias encuestas</h2>
+
+</div>
+            <div class="listado-productos"><!--Inicio de listado de productos-->
+            <div class="producto">
+                <img src="IMG/atencion telefonica.jpeg" alt="Imagen producto">
+
+                <div class="texto-producto">
+                    <p>Satisfacción del cliente - Atención telefónica de un caso de soporte.</p>
+                </div><!--info de producto-->
+            </div><!--Producto-->
+            
+
+            <div class="producto">
+                <img src="IMG/Envio de productos.png" alt="Imagen producto">
+
+                <div class="texto-producto">
+                    <p>Satisfacción del cliente con el envío de productos o uso de un producto o servicio.</p>
+                </div><!--info de producto-->
+            </div><!--Producto-->
+
+
+                <div class="producto">
+                <img src="IMG/Capacitaciones.png" alt="Imagen producto">
+
+                <div class="texto-producto">
+                    <p>Asistencia a capacitaciones y Satisfacción de empleados respecto a capacitaciones.</p>
+                </div><!--info de producto-->
+            </div><!--Producto-->
+
+
+                <div class="producto">
+                <img src="IMG/espacios.jpg" alt="Imagen producto">
+
+                <div class="texto-producto">
+                    <p>Percepción de aseo de espacios de la empresa.</p>
+                </div><!--info de producto-->
+            </div><!--Producto-->
+
+
+</main>
+
+    <footer>
+
+        </div>
+        <p class="copyright"> Todos los derechos reservados.</p>
+
+    </footer>
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Verificar autenticación
+            if (!verificarAutenticacion()) return;
+
+            // Mostrar menú según rol
+            mostrarMenuSegunRol();
+
+            // Obtener datos del usuario
+            const userName = obtenerNombreUsuario();
+            const userRole = obtenerRolUsuario();
+
+            // Mostrar nombre del usuario si existe el elemento
+            const lblNombre = document.getElementById('lblNombre');
+            if (lblNombre && userName) {
+                lblNombre.innerHTML = `${userRole}: ${userName}`;
+            }
+
+            Menu();
+        });
+
+        function Menu() {
+            const userRole = obtenerRolUsuario();
+            const menuItems = document.querySelectorAll(".enlacenav");
+
+            // Definir rutas permitidas según el rol
+            const rutasPermitidasAdmin = [
+                "MenuPrincipal.html",
+                "CrearUsuarios.html",
+                "Consultarusuarios.html",
+                "CrearEncuestas.html",
+                "ConsultarEncuestas.html",
+                "Reportes.html",
+                "#"
+            ];
+
+            const rutasPermitidasCreator = [
+                "MenuPrincipal.html",
+                "CrearEncuestas.html",
+                "ConsultarEncuestas.html",
+                "#"
+            ];
+
+            const rutasPermitidasAnalyst = [
+                "MenuPrincipal.html",
+                "Reportes.html",
+                "#"
+            ];
+
+            const ocultarElementosMenu = () => {
+                menuItems.forEach(item => {
+                    const href = item.getAttribute("href");
+                    let rutasPermitidas;
+
+                    if (userRole === "admin") {
+                        rutasPermitidas = rutasPermitidasAdmin;
+                    } else if (userRole === "creator") {
+                        rutasPermitidas = rutasPermitidasCreator;
+                    } else if (userRole === "analyst") {
+                        rutasPermitidas = rutasPermitidasAnalyst;
+                    } else {
+                        rutasPermitidas = ["MenuPrincipal.html"];
+                    }
+
+                    if (!rutasPermitidas.includes(href)) {
+                        item.style.display = "none";
+                    }
+                });
+            };
+
+            const verificarAcceso = () => {
+                const rutaActual = window.location.pathname.split("/").pop();
+                let rutasPermitidas;
+
+                if (userRole === "admin") {
+                    rutasPermitidas = rutasPermitidasAdmin;
+                } else if (userRole === "creator") {
+                    rutasPermitidas = rutasPermitidasCreator;
+                } else if (userRole === "analyst") {
+                    rutasPermitidas = rutasPermitidasAnalyst;
+                } else {
+                    rutasPermitidas = ["MenuPrincipal.html"];
+                }
+
+                if (!rutasPermitidas.includes(rutaActual)) {
+                    window.location.href = "MenuPrincipal.html";
+                }
+            };
+
+            // Asegurarse de que el rol existe
+            if (!userRole) {
+                alert("Por favor, inicia sesión nuevamente.");
+                window.location.href = "Login.html";
+                return;
+            }
+
+            ocultarElementosMenu();
+            verificarAcceso();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow-Registrate</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+</head>
+
+<body>
+
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+    </header>
+
+
+    <main class="contenido-principal contenedor">
+        <form class="formulario">
+            <h2> Datos de registro</h2>
+
+            <fieldset>
+                <legend> Información personal </legend>
+                <div class="campo">
+                    <label for="nombre"> Nombre completo: </label>
+                    <input id="nombre" type="text" placeholder="Nombre y apellido" required>
+                </div>
+
+
+                <div class="campo">
+                    <label for="email"> Correo electrónico: </label>
+                    <input id="email" type="email" placeholder="Correo electrónico" required>
+                </div>
+
+                 <div class="campo">
+                    <label for="Contraseña"> Contraseña: </label>
+                    <input id="Contraseña" type="password" placeholder="Contraseña" required>
+                </div>
+
+            
+            </fieldset>
+
+            <fieldset>
+
+            <legend>Información Empresa </legend>
+                    <div class="campo">
+                    <label for="NIT"> NIT</label>
+                    <input id="NIT" type="number" placeholder="NIT" required>
+                </div>
+                <div class="campo">
+                    <label for="empresa"> Nombre Empresa: </label>
+                    <input id="empresa" type="text" placeholder="Diligencia el nombre de tu empresa" required>
+                </div>
+                
+            </fieldset>
+            
+            <div class="Registarte">
+                <p>
+                    Ya tienes una cuenta? <a class="enlace" href="Login.html">Ingresa Aqui</a>
+                </p>
+            </div>
+            <div class="form-container">
+                <input class="btn" type="button" id="btnGuardar" value="Guardar">
+            </div>
+            </fieldset>
+        </form>
+    </main>
+
+    <footer>
+        <p class="copyright"> Todos los derechos reservados</p>
+    </footer>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('btnGuardar').addEventListener('click', function (e) {
+            Save(e);
+        });
+    });
+
+    function Save(e) {
+        e.preventDefault();
+        
+        if (validateCampos() && validateMaxLength()) {
+            // Obtener valores del formulario
+            var formData = {
+                company_name: document.getElementById("empresa").value.trim(),
+                nit: document.getElementById("NIT").value.trim(),
+                admin_name: document.getElementById("nombre").value.trim(),
+                admin_email: document.getElementById("email").value.trim(),
+                admin_password: document.getElementById("Contraseña").value.trim()
+            };
+
+            // Llamar al endpoint de registro
+            fetch('http://localhost:3000/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+                .then(async response => {
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        alert('¡Registro exitoso! Ahora puedes iniciar sesión con tu cuenta de administrador.');
+                        // Redirigir al login después de 1 segundo
+                        setTimeout(() => {
+                            window.location.href = 'Login.html';
+                        }, 1000);
+                    } else {
+                        // Mostrar error específico del servidor
+                        alert(data.error || 'Ocurrió un error al registrar la empresa');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Hubo un problema con la solicitud. Verifica tu conexión e intenta nuevamente.');
+                });
+        }
+    }
+
+    function validateCampos() {
+        const fields = [
+            { id: "nombre", message: "Debe ingresar su nombre completo\n" },
+            { id: "email", message: "Debe ingresar un correo electrónico\n" },
+            { id: "Contraseña", message: "Debe ingresar una contraseña\n" },
+            { id: "NIT", message: "Debe ingresar el NIT de la empresa\n" },
+            { id: "empresa", message: "Debe ingresar el nombre de la empresa\n" }
+        ];
+
+        let msg = "";
+        fields.forEach(field => {
+            const value = document.getElementById(field.id).value.trim();
+            if (value.length === 0) {
+                msg += field.message;
+            }
+        });
+
+        if (msg.length > 0) {
+            alert(msg);
+            return false;
+        }
+
+        // Validar formato de email
+        const email = document.getElementById("email").value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert("Por favor ingrese un correo electrónico válido");
+            return false;
+        }
+
+        return true;
+    }
+
+    function clearCampos() {
+        const fields = ["nombre", "email", "Contraseña", "NIT", "empresa"];
+        fields.forEach(fieldId => {
+            document.getElementById(fieldId).value = "";
+        });
+    }
+
+    function validateMaxLength() {
+        const fields = [
+            { id: "nombre", maxLength: 100, message: "El nombre no puede superar los 100 caracteres.\n" },
+            { id: "email", maxLength: 255, message: "El email no puede superar los 255 caracteres.\n" },
+            { id: "Contraseña", maxLength: 255, message: "La contraseña no puede superar los 255 caracteres.\n" },
+            { id: "NIT", maxLength: 50, message: "El NIT no puede superar los 50 caracteres.\n" },
+            { id: "empresa", maxLength: 255, message: "El nombre de la empresa no puede superar los 255 caracteres.\n" }
+        ];
+
+        let msg = "";
+        fields.forEach(field => {
+            const value = document.getElementById(field.id).value.trim();
+            if (value.length > field.maxLength) {
+                msg += field.message;
+            }
+        });
+
+        // Validar longitud mínima de contraseña
+        const password = document.getElementById("Contraseña").value.trim();
+        if (password.length < 6) {
+            msg += "La contraseña debe tener al menos 6 caracteres.\n";
+        }
+
+        if (msg.length > 0) {
+            alert(msg);
+            return false;
+        }
+
+        return true;
+    }
+</script>
+
+</html>

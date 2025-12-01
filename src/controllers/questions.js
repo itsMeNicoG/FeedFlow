@@ -26,16 +26,36 @@ export const addQuestion = async (c) => {
   try {
     const surveyId = c.req.param('id');
     const body = await c.req.json();
-    const { text, type, options } = body;
+    let { text, type, options } = body;
 
     // 1. Validaciones
     if (!text || !type) {
-      return c.json({ error: "El texto y el tipo de pregunta son obligatorios" }, 400);
+      return c.json({ 
+        error: "El texto y el tipo de pregunta son obligatorios",
+        missing_fields: !text ? ['text'] : ['type']
+      }, 400);
     }
 
-    const validTypes = ['text', 'number', 'single_choice', 'multiple_choice', 'rating'];
+    // Mapear tipos en español a inglés para compatibilidad
+    const typeMapping = {
+      'seleccion': 'single_choice',
+      'texto': 'text',
+      'fecha': 'date',
+      'numero': 'number',
+      'calificacion': 'rating',
+      'multiple': 'multiple_choice'
+    };
+    
+    if (typeMapping[type]) {
+      type = typeMapping[type];
+    }
+
+    const validTypes = ['text', 'number', 'single_choice', 'multiple_choice', 'rating', 'date'];
     if (!validTypes.includes(type)) {
-      return c.json({ error: `Tipo inválido. Tipos permitidos: ${validTypes.join(', ')}` }, 400);
+      return c.json({ 
+        error: `Tipo inválido: '${type}'`,
+        hint: `Tipos permitidos: ${validTypes.join(', ')} (o sus equivalentes en español: texto, numero, seleccion, multiple, calificacion, fecha)`
+      }, 400);
     }
 
     // Si es de selección, debe tener opciones

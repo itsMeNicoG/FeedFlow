@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow--Inicio de sesión</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+</head>
+
+<body>
+
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+    </header>
+
+
+    <main class="contenido-principal contenedor">
+
+        <form class="formulario" id="loginForm">
+            <fieldset>
+                <legend> Iniciar Sesión </legend>
+                <div class="campo">
+                    <label for="email"> Correo: </label>
+                    <input id="email" type="email" placeholder="Tu Correo electronico" required>
+                </div>
+
+                <div class="campo">
+                    <label for="contrasena"> Contraseña: </label>
+                    <input id="contrasena" type="password" placeholder="Tu contraseña" required>
+                </div>
+
+
+                <div class="Registarte">
+                    <p>
+                        ¿No tienes una cuenta? <a class="enlace" href="Registrate.html"> Registrate</a>
+                    </p>
+
+                </div>
+
+            </fieldset>
+
+
+            <div class="form-container">
+                <input class="btn" type="submit" value="Enviar">
+            </div>
+            </div>
+
+        </form>
+
+
+
+    </main>
+
+    <footer>
+        <p class="copyright"> Todos los derechos reservados</p>
+
+
+    </footer>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('contrasena').value.trim();
+
+            // Validar campos
+            if (!email || !password) {
+                alert('Por favor ingrese email y contraseña');
+                return;
+            }
+
+            const loginData = {
+                email: email,
+                password: password
+            };
+
+            fetch('http://localhost:3000/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(loginData)
+            })
+                .then(async response => {
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // Login exitoso
+                        // Guardar token y datos del usuario en localStorage
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('userId', data.user.id);
+                        localStorage.setItem('userName', data.user.name);
+                        localStorage.setItem('userEmail', data.user.email);
+                        localStorage.setItem('userRole', data.user.role);
+                        localStorage.setItem('companyId', data.user.company_id);
+                        
+                        // Mostrar mensaje de bienvenida
+                        alert(`¡Bienvenido ${data.user.name}!`);
+                        
+                        // Redirigir al menú principal
+                        window.location.href = 'MenuPrincipal.html';
+                    } else {
+                        // Error en login
+                        alert(data.error || 'Credenciales incorrectas');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Hubo un problema con el login. Verifica tu conexión e intenta nuevamente.');
+                });
+        });
+    </script>
+</body>
+
+</html>

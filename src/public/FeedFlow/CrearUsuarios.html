@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow-Crear usuarios</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+    <script src="JS/auth.js"></script>
+    <script src="JS/navigation.js"></script>
+</head>
+
+<body>
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+        <button onclick="cerrarSesion()" style="position: absolute; right: 20px; top: 20px; padding: 10px 20px; background-color: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Cerrar Sesión</button>
+    </header>
+
+    <div class="contenedor-navegacion">
+      <nav class="nav-principal  contenedor">
+        <li><a class="enlacenav" href="MenuPrincipal.html">Inicio</a> </li>
+        <li id="menu-usuarios" style="display: none;"> <a href="#">Gestión de usuarios</a>  
+        <ul>
+            <li> <a href="CrearUsuarios.html">Crear usuarios</a>
+            <li> <a href="Consultarusuarios.html">Consultar, editar y eliminar</a>
+        </ul>       
+        </li>
+         <li id="menu-encuestas" style="display: none;"> <a href="#">Gestión encuestas</a>  
+        <ul>
+            <li> <a href="CrearEncuestas.html">Crear encuestas</a>
+            <li> <a href="ConsultarEncuestas.html">Consultar, editar y eliminar encuestas</a>
+        </ul>       
+        </li>
+         <li id="menu-reportes" style="display: none;"> <a href="Reportes.html">Reportes</a></li>
+    </div>
+
+
+   <main class="contenido-principal contenedor">
+       
+    <form class="formulario">
+
+            <h2> Datos del usuario</h2>
+
+            <fieldset>
+                <legend> Información personal </legend>
+                <div class="campo">
+                    <label for="nombre"> Nombre completo: </label>
+                    <input id="nombre" type="text" placeholder="Nombre y apellido" required>
+                </div>
+
+
+                <div class="campo">
+                    <label for="email"> Correo electrónico: </label>
+                    <input id="email" type="email" placeholder="Correo electrónico" required>
+                </div>
+
+                 <div class="campo">
+                    <label for="Contraseña"> Contraseña: </label>
+                    <input id="Contraseña" type="password" placeholder="Contraseña" required>
+                </div>
+
+
+               <div class="campo">
+                    <label for="Rol"> Rol de usuario</label>
+                    <select id="Rol" >
+                        <option value="">--Selecciona una opción--</option>
+                        <option value="creator">Creador</option>
+                        <option value="analyst">Analista</option>
+                    </select>
+                </div>
+            </fieldset>
+
+        
+            <div class="btn">
+                <input class="btn" type="button" id="btnGuardar" value="Guardar">
+            </div>
+
+        </form>
+    </main>
+    <footer>
+
+        </div>
+        <p class="copyright"> Todos los derechos reservados.</p>
+
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Verificar autenticación y permisos
+            if (!verificarAutenticacion()) return;
+            if (!verificarAccesoRol(['admin'])) return;
+
+            mostrarMenuSegunRol();
+
+            // Manejar envío del formulario
+            document.getElementById('btnGuardar').addEventListener('click', function () {
+                const nombre = document.getElementById("nombre").value.trim();
+                const email = document.getElementById("email").value.trim();
+                const password = document.getElementById("Contraseña").value.trim();
+                const rol = document.getElementById("Rol").value;
+
+                // Validaciones
+                if (!nombre || !email || !password || !rol) {
+                    alert("Por favor, completa todos los campos.");
+                    return;
+                }
+
+                if (!email.includes("@")) {
+                    alert("Por favor, ingresa un correo electrónico válido.");
+                    return;
+                }
+
+                if (password.length < 8) {
+                    alert("La contraseña debe tener al menos 8 caracteres.");
+                    return;
+                }
+
+                // Preparar datos para enviar
+                const userData = {
+                    name: nombre,
+                    email: email,
+                    password: password,
+                    role: rol
+                };
+
+                // Enviar datos al servidor
+                fetch('http://localhost:3000/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(userData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(error => {
+                            throw new Error(error.message || 'Error al crear el usuario');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert(`Usuario creado exitosamente: ${data.data.name}`);
+                    // Limpiar formulario
+                    document.getElementById("nombre").value = "";
+                    document.getElementById("email").value = "";
+                    document.getElementById("Contraseña").value = "";
+                    document.getElementById("Rol").value = "";
+                })
+                .catch(error => {
+                    alert(error.message || 'Hubo un problema al crear el usuario');
+                    console.error('Error:', error);
+                });
+            });
+        });
+    </script>
+
+</body>
+
+</html>

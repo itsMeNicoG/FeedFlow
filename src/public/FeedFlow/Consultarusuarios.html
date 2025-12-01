@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow-Inicio</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+    <script src="JS/auth.js"></script>
+    <script src="JS/navigation.js"></script>
+
+</head>
+
+<body>
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+        <button onclick="cerrarSesion()" style="position: absolute; right: 20px; top: 20px; padding: 10px 20px; background-color: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Cerrar Sesión</button>
+    </header>
+
+    <div class="contenedor-navegacion">
+      <nav class="nav-principal  contenedor">
+        <li><a class="enlacenav" href="MenuPrincipal.html">Inicio</a> </li>
+        <li id="menu-usuarios" style="display: none;"> <a href="#">Gestión de usuarios</a>  
+        <ul>
+            <li> <a href="CrearUsuarios.html">Crear usuarios</a>
+            <li> <a href="Consultarusuarios.html">Consultar, editar y eliminar</a>
+        </ul>       
+        </li>
+         <li id="menu-encuestas" style="display: none;"> <a href="#">Gestión encuestas</a>  
+        <ul>
+            <li> <a href="CrearEncuestas.html">Crear encuestas</a>
+            <li> <a href="ConsultarEncuestas.html">Consultar, editar y eliminar encuestas</a>
+        </ul>       
+        </li>
+         <li id="menu-reportes" style="display: none;"> <a href="Reportes.html">Reportes</a></li>
+        
+</nav>
+
+    </div>
+
+   
+    <main class="contenido-principal contenedor">
+           <h2>Consulta de usuarios</h2>
+    <div class="campo">
+             <table id="tablaUsuarios">
+              <thead>
+                <tr>
+                  <th>Nombre usuario</th>
+                  <th>Correo electrónico</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Fecha de creación</th>
+                  <th>Editar estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Los usuarios se cargarán aquí dinámicamente -->
+              </tbody>
+            </table>
+     </div>
+    </main>
+  <footer>
+
+    </div>
+    <p class="copyright"> Todos los derechos reservados.</p>
+
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Verificar autenticación y rol admin
+      if (!verificarAutenticacion()) return;
+      if (!verificarAccesoRol(['admin'])) return;
+
+      mostrarMenuSegunRol();
+      // Cargar usuarios automáticamente
+      cargarUsuarios();
+    });
+
+    function cargarUsuarios() {
+      const token = obtenerToken();
+      const tbody = document.querySelector("#tablaUsuarios tbody");
+      
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Cargando usuarios...</td></tr>';
+
+      fetch('http://localhost:3000/users', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(error => {
+            throw new Error(error.message || 'Error al cargar usuarios');
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        tbody.innerHTML = ''; // Limpiar tabla
+
+        if (data.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay usuarios registrados</td></tr>';
+          return;
+        }
+
+        data.data.forEach(user => {
+          const row = document.createElement('tr');
+          
+          // Formatear fecha
+          const fecha = new Date(user.created_at);
+          const fechaFormateada = fecha.toLocaleDateString('es-CO');
+
+          // Traducir rol
+          const rolTraducido = user.role === 'admin' ? 'Administrador' : 
+                               user.role === 'creator' ? 'Creador' : 
+                               user.role === 'analyst' ? 'Analista' : user.role;
+
+          row.innerHTML = `
+            <td>${user.name}</td>
+            <td>${user.email}</td>
+            <td>${rolTraducido}</td>
+            <td>${user.status === 'active' ? 'Activo' : 'Inactivo'}</td>
+            <td>${fechaFormateada}</td>
+            <td>
+              <label>
+                <input 
+                  class="campo" 
+                  type="checkbox" 
+                  ${user.status === 'active' ? 'checked' : ''} 
+                  onchange="cambiarEstado(${user.id}, this.checked)"
+                  ${user.role === 'admin' ? 'disabled title="No se puede desactivar un admin"' : ''}
+                >
+              </label>
+            </td>
+          `;
+          
+          tbody.appendChild(row);
+        });
+      })
+      .catch(error => {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">Error: ${error.message}</td></tr>`;
+        console.error('Error:', error);
+      });
+    }
+
+    function cambiarEstado(userId, nuevoEstado) {
+      const token = obtenerToken();
+
+      fetch(`http://localhost:3000/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: nuevoEstado ? 'active' : 'inactive' })
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(error => {
+            throw new Error(error.message || 'Error al cambiar estado');
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert(`Estado actualizado: ${data.data.name} ahora está ${data.data.status === 'active' ? 'activo' : 'inactivo'}`);
+        cargarUsuarios(); // Recargar tabla
+      })
+      .catch(error => {
+        alert(error.message || 'Hubo un problema al cambiar el estado');
+        console.error('Error:', error);
+        cargarUsuarios(); // Recargar para revertir el checkbox
+      });
+    }
+  </script>
+
+</body>
+
+</html>

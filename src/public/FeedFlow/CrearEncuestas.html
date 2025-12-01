@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow-Crear encuestas</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+    <script src="JS/auth.js"></script>
+    <script src="JS/navigation.js"></script>
+    <style>
+        /* Estilos adicionales para la funcionalidad dinámica */
+        .campo-pregunta {
+            display: none;
+            margin-bottom: 20px;
+        }
+        
+        .campo-pregunta.visible {
+            display: block;
+        }
+        
+        .campo-opciones {
+            margin-left: 20px;
+        }
+        
+        .campo-opcion {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .campo-opcion input[type="text"] {
+            margin-left: 10px;
+            flex-grow: 1;
+        }
+        
+        .btn-eliminar-opcion {
+            margin-left: 10px;
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        
+        .btn-eliminar-pregunta {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .contenedor-preguntas {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+        <button onclick="cerrarSesion()" style="position: absolute; right: 20px; top: 20px; padding: 10px 20px; background-color: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Cerrar Sesión</button>
+    </header>
+
+    <div class="contenedor-navegacion">
+      <nav class="nav-principal  contenedor">
+        <li><a class="enlacenav" href="MenuPrincipal.html">Inicio</a> </li>
+        <li id="menu-usuarios" style="display: none;"> <a href="#">Gestión de usuarios</a>  
+        <ul>
+            <li> <a href="CrearUsuarios.html">Crear usuarios</a>
+            <li> <a href="Consultarusuarios.html">Consultar, editar y eliminar</a>
+        </ul>       
+        </li>
+         <li id="menu-encuestas" style="display: none;"> <a href="#">Gestión encuestas</a>  
+        <ul>
+            <li> <a href="CrearEncuestas.html">Crear encuestas</a>
+            <li> <a href="ConsultarEncuestas.html">Consultar, editar y eliminar encuestas</a>
+        </ul>       
+        </li>
+         <li id="menu-reportes" style="display: none;"> <a href="Reportes.html">Reportes</a></li>
+        
+</nav>
+
+   </div>
+
+    <main class="contenido-principal contenedor">
+        <div>
+          <h2> Datos de encuesta</h2>
+
+          <fieldset>
+             <div class="campo">
+                    <label for="TituloEncuesta">Título encuesta</label>
+                    <input id="TituloEncuesta" type="text"  placeholder="Título encuesta" required>
+                </div>
+                <div class="campo">
+                    <label for="Descripción">Descripción</label>
+                    <input id="Descripción" type="text"  placeholder="Descripción" required>
+                </div>
+          </fieldset>
+
+            <!-- Contenedor para las preguntas -->
+            <div class="contenedor-preguntas" id="contenedorPreguntas">
+                <!-- Las preguntas se agregarán aquí dinámicamente -->
+            </div>
+
+            <div>
+                <input class="btn" type="button" id="btnAgregar" value="Agregar pregunta">
+            </div>
+
+            <div>
+                <input class="btn" type="button" id="btnGuardar" value="Guardar Encuesta">
+            </div>
+         
+        </div>
+            
+    </main>
+    <footer>
+        <p class="copyright"> Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Verificar autenticación y permisos
+            if (!verificarAutenticacion()) return;
+            if (!verificarAccesoRol(['admin', 'creator'])) return;
+
+            mostrarMenuSegunRol();
+
+            // Variables globales
+            let contadorPreguntas = 0;
+            const contenedorPreguntas = document.getElementById('contenedorPreguntas');
+            const btnAgregar = document.getElementById('btnAgregar');
+            const btnGuardar = document.getElementById('btnGuardar');
+            const radiosTipoEncuesta = document.querySelectorAll('input[name="tipoEncuesta"]');
+            
+            // Función para crear una nueva pregunta
+            function crearPregunta() {
+                contadorPreguntas++;
+                const preguntaId = `pregunta-${contadorPreguntas}`;
+                
+                // Crear el contenedor de la pregunta
+                const campoPregunta = document.createElement('fieldset');
+                campoPregunta.id = preguntaId;
+                campoPregunta.className = 'campo-pregunta';
+                
+                // Crear el número de pregunta
+                const numeroPregunta = document.createElement('div');
+                numeroPregunta.className = 'campo';
+                numeroPregunta.innerHTML = `
+                    <label for="pregunta-texto-${contadorPreguntas}">${contadorPreguntas}.</label>
+                    <input id="pregunta-texto-${contadorPreguntas}" type="text" placeholder="Pregunta" required>
+                `;
+                
+                // Crear el selector de tipo de pregunta
+                const selectorTipo = document.createElement('div');
+                selectorTipo.className = 'campo';
+                selectorTipo.innerHTML = `
+                    <label>Tipo de respuesta:</label>
+                    <input type="radio" name="tipoPregunta-${contadorPreguntas}" value="single_choice" id="tipoSeleccion-${contadorPreguntas}">
+                    <label for="tipoSeleccion-${contadorPreguntas}">Selección</label>
+                    <input type="radio" name="tipoPregunta-${contadorPreguntas}" value="text" id="tipoTexto-${contadorPreguntas}">
+                    <label for="tipoTexto-${contadorPreguntas}">Texto</label>
+                    <input type="radio" name="tipoPregunta-${contadorPreguntas}" value="date" id="tipoFecha-${contadorPreguntas}">
+                    <label for="tipoFecha-${contadorPreguntas}">Fecha</label>
+                `;
+                
+                // Crear contenedor para opciones/respuesta
+                const contenedorRespuesta = document.createElement('div');
+                contenedorRespuesta.id = `contenedor-respuesta-${contadorPreguntas}`;
+                
+                // Botón para eliminar pregunta
+                const btnEliminarPregunta = document.createElement('button');
+                btnEliminarPregunta.type = 'button';
+                btnEliminarPregunta.className = 'btn-eliminar-pregunta';
+                btnEliminarPregunta.textContent = 'Eliminar pregunta';
+                btnEliminarPregunta.addEventListener('click', function() {
+                    campoPregunta.remove();
+                    // Reorganizar números de pregunta
+                    reorganizarNumerosPreguntas();
+                });
+                
+                // Agregar elementos al campo de pregunta
+                campoPregunta.appendChild(numeroPregunta);
+                campoPregunta.appendChild(selectorTipo);
+                campoPregunta.appendChild(contenedorRespuesta);
+                campoPregunta.appendChild(btnEliminarPregunta);
+                
+                // Agregar evento a los radios de tipo de pregunta
+                const radiosTipoPregunta = campoPregunta.querySelectorAll(`input[name="tipoPregunta-${contadorPreguntas}"]`);
+                radiosTipoPregunta.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        mostrarOpcionesPregunta(this.value, contenedorRespuesta, contadorPreguntas);
+                    });
+                });
+                
+                // Agregar al contenedor principal
+                contenedorPreguntas.appendChild(campoPregunta);
+                
+                // Mostrar la pregunta
+                campoPregunta.classList.add('visible');
+                
+                return campoPregunta;
+            }
+            
+            // Función para mostrar las opciones según el tipo de pregunta
+            function mostrarOpcionesPregunta(tipo, contenedor, preguntaId) {
+                // Limpiar contenedor
+                contenedor.innerHTML = '';
+                
+                switch(tipo) {
+                    case 'single_choice':
+                        // Crear opciones de selección
+                        const campoOpciones = document.createElement('div');
+                        campoOpciones.className = 'campo-opciones';
+                        
+                        // Agregar dos opciones por defecto
+                        agregarOpcion(campoOpciones, preguntaId);
+                        agregarOpcion(campoOpciones, preguntaId);
+                        
+                        // Botón para agregar más opciones
+                        const btnAgregarOpcion = document.createElement('button');
+                        btnAgregarOpcion.type = 'button';
+                        btnAgregarOpcion.className = 'btn';
+                        btnAgregarOpcion.textContent = 'Agregar opción';
+                        btnAgregarOpcion.addEventListener('click', function() {
+                            agregarOpcion(campoOpciones, preguntaId);
+                        });
+                        
+                        campoOpciones.appendChild(btnAgregarOpcion);
+                        contenedor.appendChild(campoOpciones);
+                        break;
+                        
+                    case 'text':
+                        // Crear campo de texto
+                        const campoTexto = document.createElement('div');
+                        campoTexto.className = 'campo';
+                        campoTexto.innerHTML = `
+                            <input type="text" placeholder="Respuesta" disabled>
+                        `;
+                        contenedor.appendChild(campoTexto);
+                        break;
+                        
+                    case 'date':
+                        // Crear selector de fecha
+                        const campoFecha = document.createElement('div');
+                        campoFecha.className = 'campo';
+                        campoFecha.innerHTML = `
+                            <input type="date" placeholder="Respuesta" disabled>
+                        `;
+                        contenedor.appendChild(campoFecha);
+                        break;
+                }
+            }
+            
+            // Función para agregar una opción a una pregunta de selección
+            function agregarOpcion(contenedor, preguntaId) {
+                const opcionId = Date.now(); // ID único basado en timestamp
+                
+                const campoOpcion = document.createElement('div');
+                campoOpcion.className = 'campo-opcion';
+                campoOpcion.innerHTML = `
+                    <input type="radio" name="opcion-${preguntaId}" disabled>
+                    <input type="text" placeholder="Opción">
+                    <button type="button" class="btn-eliminar-opcion">Eliminar</button>
+                `;
+                
+                // Agregar evento al botón eliminar
+                const btnEliminar = campoOpcion.querySelector('.btn-eliminar-opcion');
+                btnEliminar.addEventListener('click', function() {
+                    campoOpcion.remove();
+                });
+                
+                contenedor.appendChild(campoOpcion);
+            }
+            
+            // Función para reorganizar los números de pregunta después de eliminar una
+            function reorganizarNumerosPreguntas() {
+                const preguntas = contenedorPreguntas.querySelectorAll('fieldset');
+                preguntas.forEach((pregunta, index) => {
+                    const numero = index + 1;
+                    const label = pregunta.querySelector('label');
+                    const input = pregunta.querySelector('input[type="text"]');
+                    
+                    label.textContent = `${numero}.`;
+                    label.setAttribute('for', `pregunta-texto-${numero}`);
+                    input.id = `pregunta-texto-${numero}`;
+                    
+                    // Actualizar también los nombres de los radios de tipo
+                    const radios = pregunta.querySelectorAll('input[type="radio"]');
+                    radios.forEach(radio => {
+                        if (radio.name.startsWith('tipoPregunta-')) {
+                            radio.name = `tipoPregunta-${numero}`;
+                        }
+                    });
+                });
+                
+                contadorPreguntas = preguntas.length;
+            }
+            
+            // Evento para el botón "Agregar pregunta"
+            btnAgregar.addEventListener('click', function() {
+                crearPregunta();
+            });
+            
+            // Evento para el botón "Guardar Encuesta"
+            btnGuardar.addEventListener('click', function() {
+                // Verificar autenticación
+                const token = obtenerToken();
+                const userRole = obtenerRolUsuario();
+
+                if (!token) {
+                    alert("Por favor, inicia sesión.");
+                    window.location.href = "Login.html";
+                    return;
+                }
+
+                if (userRole !== "admin" && userRole !== "creator") {
+                    alert("No tienes permisos para crear encuestas.");
+                    return;
+                }
+
+                // Obtener datos del formulario
+                const titulo = document.getElementById('TituloEncuesta').value.trim();
+                const descripcion = document.getElementById('Descripción').value.trim();
+
+                if (!titulo || !descripcion) {
+                    alert('Por favor, completa el título y la descripción de la encuesta.');
+                    return;
+                }
+
+                // Validar que al menos haya una pregunta
+                if (contadorPreguntas === 0) {
+                    alert('Debe agregar al menos una pregunta a la encuesta.');
+                    return;
+                }
+
+                // Recopilar preguntas
+                const preguntas = [];
+                const preguntasFieldset = contenedorPreguntas.querySelectorAll('fieldset');
+                
+                for (let i = 0; i < preguntasFieldset.length; i++) {
+                    const pregunta = preguntasFieldset[i];
+                    const textoPregunta = pregunta.querySelector('input[type="text"]').value.trim();
+                    
+                    if (!textoPregunta) {
+                        alert(`La pregunta ${i + 1} no tiene texto.`);
+                        return;
+                    }
+
+                    // Obtener tipo de pregunta seleccionado
+                    const tipoSeleccionado = pregunta.querySelector('input[name^="tipoPregunta-"]:checked');
+                    
+                    if (!tipoSeleccionado) {
+                        alert(`Selecciona el tipo de respuesta para la pregunta ${i + 1}.`);
+                        return;
+                    }
+
+                    const tipoPregunta = tipoSeleccionado.value;
+                    
+                    const preguntaData = {
+                        text: textoPregunta,
+                        type: tipoPregunta,
+                        options: []
+                    };
+
+                    // Si es de selección, obtener opciones
+                    if (tipoPregunta === 'single_choice') {
+                        const opciones = pregunta.querySelectorAll('.campo-opcion input[type="text"]');
+                        
+                        if (opciones.length < 2) {
+                            alert(`La pregunta ${i + 1} debe tener al menos 2 opciones.`);
+                            return;
+                        }
+
+                        opciones.forEach(opcion => {
+                            const textoOpcion = opcion.value.trim();
+                            if (textoOpcion) {
+                                preguntaData.options.push(textoOpcion);
+                            }
+                        });
+
+                        if (preguntaData.options.length < 2) {
+                            alert(`La pregunta ${i + 1} debe tener al menos 2 opciones con texto.`);
+                            return;
+                        }
+                    }
+
+                    preguntas.push(preguntaData);
+                }
+
+                // Preparar datos de la encuesta
+                const encuestaData = {
+                    title: titulo,
+                    description: descripcion,
+                    questions: preguntas
+                };
+
+                // Enviar al servidor
+                fetch('http://localhost:3000/surveys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(encuestaData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(error => {
+                            throw new Error(error.message || 'Error al crear la encuesta');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert(`Encuesta creada exitosamente: ${data.data.title}`);
+                    // Limpiar formulario
+                    document.getElementById('TituloEncuesta').value = '';
+                    document.getElementById('Descripción').value = '';
+                    contenedorPreguntas.innerHTML = '';
+                    contadorPreguntas = 0;
+                })
+                .catch(error => {
+                    alert(error.message || 'Hubo un problema al crear la encuesta');
+                    console.error('Error:', error);
+                });
+            });
+            
+            // Evento para los radios de tipo de encuesta (si es necesario para algo específico)
+            radiosTipoEncuesta.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // Si necesitas hacer algo cuando cambia el tipo de encuesta general
+                    console.log('Tipo de encuesta seleccionado:', this.value);
+                });
+            });
+        });
+    </script>
+    
+</body>
+
+</html>

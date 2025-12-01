@@ -2,31 +2,36 @@
  * @fileoverview Report generation routes with RBAC
  * @module routes/reports
  * @description
- * All report routes are restricted to 'analyst' role only
+ * All report routes are restricted to 'admin' and 'analyst' roles only (creator excluded)
  */
 
 import { Hono } from 'hono';
-import { getCompanyReports, exportReportExcel, exportReportPDF } from '../controllers/reports.js';
-import { requireRole } from '../middleware/auth.js';
+import { getCompanyReports, exportReportExcel, exportReportPDF, getIndividualResponses } from '../controllers/reports.js';
+import { authMiddleware, checkUserActive, requireRoles } from '../middleware/auth.js';
 
 const app = new Hono();
 
 /**
- * GET /reports/:companyId - Generate aggregated survey report (JSON)
- * @access analyst role only
- * @param {number} companyId - Company ID
- * @query {number} survey_id - Required: Survey to generate report for
+ * GET /reports/:surveyId - Generate aggregated survey report (JSON)
+ * @access admin and analyst roles only
+ * @param {number} surveyId - Survey ID
  */
-app.get('/:companyId', requireRole('analyst'), getCompanyReports);
+app.get('/:surveyId', authMiddleware, checkUserActive, requireRoles(['admin', 'analyst']), getCompanyReports);
 
 /**
- * GET /reports/:companyId/export - Export survey report as Excel or PDF
- * @access analyst role only
- * @param {number} companyId - Company ID
- * @query {number} survey_id - Required: Survey to generate report for
+ * GET /reports/:surveyId/responses - Get individual survey responses
+ * @access admin and analyst roles only
+ * @param {number} surveyId - Survey ID
+ */
+app.get('/:surveyId/responses', authMiddleware, checkUserActive, requireRoles(['admin', 'analyst']), getIndividualResponses);
+
+/**
+ * GET /reports/:surveyId/export - Export survey report as Excel or PDF
+ * @access admin and analyst roles only
+ * @param {number} surveyId - Survey ID
  * @query {string} format - Required: 'xlsx' or 'pdf'
  */
-app.get('/:companyId/export', requireRole('analyst'), async (c) => {
+app.get('/:surveyId/export', authMiddleware, checkUserActive, requireRoles(['admin', 'analyst']), async (c) => {
   const format = c.req.query('format');
   
   if (!format) {

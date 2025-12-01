@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { serveStatic } from 'hono/bun';
 import companies from './routes/companies.js';
 import users from './routes/users.js';
 import surveys from './routes/surveys.js';
@@ -10,6 +11,9 @@ import { registerCompanyAdmin } from './controllers/users.js';
 import { authMiddleware, checkUserActive } from './middleware/auth.js';
 
 const app = new Hono();
+
+// Servir archivos estáticos desde la carpeta public
+app.use('/public/*', serveStatic({ root: './src' }));
 
 // Ruta de bienvenida para verificar que el servidor corre
 app.get('/', (c) => {
@@ -25,10 +29,10 @@ app.post('/webhook/whatsapp', webhookWhatsapp); // Webhook
 
 // Rutas Protegidas (Requieren Token + Usuario Activo)
 // Aplicamos el middleware a todas las rutas que definamos debajo de esto
-app.use('/companies/*', authMiddleware, checkUserActive);
-app.use('/users/*', authMiddleware, checkUserActive);
-app.use('/surveys/*', authMiddleware, checkUserActive);
-app.use('/reports/*', authMiddleware, checkUserActive);
+app.use('/companies*', authMiddleware, checkUserActive);
+app.use('/users*', authMiddleware, checkUserActive);
+app.use('/surveys*', authMiddleware, checkUserActive);
+app.use('/reports*', authMiddleware, checkUserActive);
 
 // Conectar los módulos de rutas protegidas
 app.route('/companies', companies);

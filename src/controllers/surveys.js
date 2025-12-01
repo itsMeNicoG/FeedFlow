@@ -21,41 +21,157 @@ const generateSlug = () => Math.random().toString(36).substring(2, 10);
  * 
  * @example
  * POST /surveys
- * Body: { "company_id": 1, "created_by": 5, "title": "Customer Satisfaction", "start_date": "2025-01-01" }
+ * Body: { 
+ *   "title": "Customer Satisfaction", 
+ *   "description": "...", 
+ *   "questions": [
+ *     {"text": "How satisfied?", "type": "seleccion", "options": ["Yes", "No"]}
+ *   ]
+ * }
  * Response: { "data": { "id": 10, "links": { "short_link": "...", "qr_code": "..." } } }
  */
 export const createSurvey = async (c) => {
   try {
     const body = await c.req.json();
-    const { company_id, created_by, title, description, start_date, end_date } = body;
+    const { title, description, start_date, end_date, questions } = body;
 
-    if (!company_id || !created_by || !title) {
-      return c.json({ error: "Faltan campos obligatorios" }, 400);
+    // Validación detallada de campos obligatorios
+    const missingFields = [];
+    if (!title) missingFields.push('title');
+    
+    if (missingFields.length > 0) {
+      return c.json({ 
+        error: "Faltan campos obligatorios",
+        missing_fields: missingFields,
+        hint: "El campo 'title' es obligatorio"
+      }, 400);
     }
+
+    // Validar preguntas si se proporcionan
+    if (questions) {
+      if (!Array.isArray(questions)) {
+        return c.json({ 
+          error: "El campo 'questions' debe ser un array",
+          hint: "Formato esperado: questions: [{text: '...', type: '...', options: [...]}]"
+        }, 400);
+      }
+
+      // Validar cada pregunta
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (!q.text || !q.type) {
+          return c.json({ 
+            error: `La pregunta #${i + 1} está incompleta`,
+            missing_fields: !q.text ? ['text'] : ['type'],
+            hint: "Cada pregunta debe tener 'text' y 'type'"
+          }, 400);
+        }
+
+        // Mapear tipos en español a inglés para compatibilidad con frontend
+        const typeMapping = {
+          'seleccion': 'single_choice',
+          'texto': 'text',
+          'fecha': 'date',
+          'numero': 'number',
+          'calificacion': 'rating',
+          'multiple': 'multiple_choice'
+        };
+        
+        if (typeMapping[q.type]) {
+          q.type = typeMapping[q.type];
+        }
+
+        const validTypes = ['text', 'number', 'single_choice', 'multiple_choice', 'rating', 'date'];
+        if (!validTypes.includes(q.type)) {
+          return c.json({ 
+            error: `Tipo de pregunta inválido en pregunta #${i + 1}: '${q.type}'`,
+            hint: `Tipos permitidos: text, number, single_choice, multiple_choice, rating, date (o sus equivalentes en español: texto, numero, seleccion, multiple, calificacion, fecha)`
+          }, 400);
+        }
+
+        // Validar opciones para preguntas de selección
+        if (['single_choice', 'multiple_choice'].includes(q.type)) {
+          if (!q.options || !Array.isArray(q.options) || q.options.length === 0) {
+            return c.json({ 
+              error: `La pregunta #${i + 1} de tipo '${q.type}' requiere opciones`,
+              hint: "Debe proporcionar un array 'options' con al menos una opción"
+            }, 400);
+          }
+        }
+      }
+    }
+
+    // Obtener company_id y user id del JWT
+    const payload = c.get('jwtPayload');
+    const company_id = payload.company_id;
+    const created_by = payload.id;
 
     const slug = generateSlug();
 
-    const query = db.query(`
-      INSERT INTO surveys (company_id, created_by, title, description, start_date, end_date, link_slug)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      RETURNING id, link_slug
-    `);
+    // Usar transacción para crear encuesta y preguntas atómicamente
+    const transaction = db.transaction(() => {
+      // 1. Crear la encuesta
+      const insertSurvey = db.prepare(`
+        INSERT INTO surveys (company_id, created_by, title, description, start_date, end_date, link_slug)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        RETURNING id, link_slug
+      `);
+      
+      const survey = insertSurvey.get(company_id, created_by, title, description, start_date, end_date, slug);
 
-    const result = query.get(company_id, created_by, title, description, start_date, end_date, slug);
+      // 2. Crear las preguntas si existen
+      const createdQuestions = [];
+      if (questions && questions.length > 0) {
+        const insertQuestion = db.prepare("INSERT INTO questions (survey_id, text, type, \"order\") VALUES (?, ?, ?, ?) RETURNING id");
+        const insertOption = db.prepare("INSERT INTO options (question_id, text, value) VALUES (?, ?, ?)");
+
+        for (let i = 0; i < questions.length; i++) {
+          const q = questions[i];
+          
+          // Insertar pregunta
+          const question = insertQuestion.get(survey.id, q.text, q.type, i);
+
+          // Insertar opciones si existen
+          const questionOptions = [];
+          if (q.options && q.options.length > 0) {
+            for (const opt of q.options) {
+              const optText = typeof opt === 'object' ? opt.text : opt;
+              const optValue = typeof opt === 'object' ? opt.value : opt;
+              insertOption.run(question.id, optText, optValue);
+              questionOptions.push({ text: optText, value: optValue });
+            }
+          }
+
+          createdQuestions.push({
+            id: question.id,
+            text: q.text,
+            type: q.type,
+            order: i,
+            options: questionOptions
+          });
+        }
+      }
+
+      return { survey, questions: createdQuestions };
+    });
+
+    const result = transaction();
 
     return c.json({
       message: "Encuesta creada exitosamente",
       data: {
-        ...result,
+        id: result.survey.id,
+        link_slug: result.survey.link_slug,
         title,
         description,
         start_date,
         end_date,
         company_id,
         created_by,
+        questions: result.questions,
         links: {
-          short_link: `https://feedflow.app/s/${result.link_slug}`,
-          qr_code: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://feedflow.app/s/${result.link_slug}`
+          short_link: `https://feedflow.app/s/${result.survey.link_slug}`,
+          qr_code: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://feedflow.app/s/${result.survey.link_slug}`
         }
       }
     }, 201);
@@ -66,24 +182,31 @@ export const createSurvey = async (c) => {
 };
 
 /**
- * Retrieves all surveys for a given company
+ * Retrieves all surveys for the authenticated user's company
  * @param {import('hono').Context} c - Hono context object
  * @returns {Response} JSON response with array of surveys ordered by creation date (newest first)
- * @throws {Error} If company_id query parameter is missing
+ * 
+ * @description
+ * Returns all surveys for the company of the authenticated user (from JWT payload).
+ * Results are ordered by creation date (newest first).
  * 
  * @example
- * GET /surveys?company_id=1
+ * GET /surveys
  * Response: { "data": [{ "id": 1, "title": "...", "created_at": "..." }] }
  */
 export const getSurveys = (c) => {
   try {
-    const company_id = c.req.query('company_id');
-    
-    if (!company_id) {
-      return c.json({ error: "Se requiere el parámetro company_id" }, 400);
-    }
+    // Obtener company_id del token JWT del usuario autenticado
+    const payload = c.get('jwtPayload');
+    const company_id = payload.company_id;
 
-    const query = db.query("SELECT * FROM surveys WHERE company_id = ? ORDER BY created_at DESC");
+    const query = db.query(`
+      SELECT s.*, u.name as creator_name 
+      FROM surveys s
+      LEFT JOIN users u ON s.created_by = u.id
+      WHERE s.company_id = ? 
+      ORDER BY s.created_at DESC
+    `);
     const surveys = query.all(company_id);
 
     return c.json({ data: surveys });

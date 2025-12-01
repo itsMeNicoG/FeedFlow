@@ -17,7 +17,7 @@ import {
   duplicateSurvey 
 } from '../controllers/surveys.js';
 import { addQuestion, deleteQuestion } from '../controllers/questions.js';
-import { requireRole } from '../middleware/auth.js';
+import { authMiddleware, checkUserActive, requireRole } from '../middleware/auth.js';
 
 const app = new Hono();
 
@@ -25,48 +25,48 @@ const app = new Hono();
  * GET /surveys - List all surveys for a company
  * @query {number} company_id - Required
  */
-app.get('/', getSurveys);
+app.get('/', authMiddleware, checkUserActive, getSurveys);
 
 /**
  * GET /surveys/:id - Get survey details with questions and options
  * @param {number} id - Survey ID
  */
-app.get('/:id', getSurveyById);
+app.get('/:id', authMiddleware, checkUserActive, getSurveyById);
 
 /**
  * POST /surveys - Create a new survey
  * @access creator role only
  */
-app.post('/', requireRole('creator'), createSurvey);
+app.post('/', authMiddleware, checkUserActive, requireRole('creator'), createSurvey);
 
 /**
  * PUT /surveys/:id - Update survey metadata
  * @access creator role only
  */
-app.put('/:id', requireRole('creator'), updateSurvey);
+app.put('/:id', authMiddleware, checkUserActive, requireRole('creator'), updateSurvey);
 
 /**
  * DELETE /surveys/:id - Delete survey and all related data
  * @access creator role only
  */
-app.delete('/:id', requireRole('creator'), deleteSurvey);
+app.delete('/:id', authMiddleware, checkUserActive, requireRole('creator'), deleteSurvey);
 
 /**
  * POST /surveys/:id/duplicate - Duplicate survey with questions
  * @access creator role only
  */
-app.post('/:id/duplicate', requireRole('creator'), duplicateSurvey);
+app.post('/:id/duplicate', authMiddleware, checkUserActive, requireRole('creator'), duplicateSurvey);
 
 /**
  * POST /surveys/:id/questions - Add question to survey
  * @access creator role only
  */
-app.post('/:id/questions', requireRole('creator'), addQuestion);
+app.post('/:id/questions', authMiddleware, checkUserActive, requireRole('creator'), addQuestion);
 
 /**
  * DELETE /surveys/:id/questions/:questionId - Remove question from survey
  * @access creator role only
  */
-app.delete('/:id/questions/:questionId', requireRole('creator'), deleteQuestion);
+app.delete('/:id/questions/:questionId', authMiddleware, checkUserActive, requireRole('creator'), deleteQuestion);
 
 export default app;

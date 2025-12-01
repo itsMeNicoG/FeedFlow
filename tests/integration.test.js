@@ -430,15 +430,15 @@ describe("FeedFlow API Integration Tests", () => {
   });
 
   // --- TEST: VER REPORTES (Solo Analista) ---
-  test("GET /reports/:companyId - Analista puede ver, Creador NO", async () => {
+  test("GET /reports/:surveyId - Analista puede ver, Creador NO", async () => {
     // Intento de Creador (Debe fallar)
-    const resFail = await app.request(`/reports/${companyId}?survey_id=${surveyId}`, {
+    const resFail = await app.request(`/reports/${surveyId}`, {
       headers: { "Authorization": `Bearer ${creatorToken}` }
     });
     expect(resFail.status).toBe(403);
 
     // Intento de Analista (Debe funcionar)
-    const resSuccess = await app.request(`/reports/${companyId}?survey_id=${surveyId}`, {
+    const resSuccess = await app.request(`/reports/${surveyId}`, {
       headers: { "Authorization": `Bearer ${analystToken}` }
     });
     
@@ -519,8 +519,8 @@ describe("FeedFlow API Integration Tests", () => {
   });
 
   // --- TEST: EXPORTAR A EXCEL ---
-  test("GET /reports/:companyId/export?format=xlsx - Analista puede exportar a Excel", async () => {
-    const res = await app.request(`/reports/${companyId}/export?survey_id=${surveyId}&format=xlsx`, {
+  test("GET /reports/:surveyId/export?format=xlsx - Analista puede exportar a Excel", async () => {
+    const res = await app.request(`/reports/${surveyId}/export?format=xlsx`, {
       headers: { "Authorization": `Bearer ${analystToken}` }
     });
 
@@ -529,8 +529,8 @@ describe("FeedFlow API Integration Tests", () => {
   });
 
   // --- TEST: EXPORTAR A PDF ---
-  test("GET /reports/:companyId/export?format=pdf - Analista puede exportar a PDF", async () => {
-    const res = await app.request(`/reports/${companyId}/export?survey_id=${surveyId}&format=pdf`, {
+  test("GET /reports/:surveyId/export?format=pdf - Analista puede exportar a PDF", async () => {
+    const res = await app.request(`/reports/${surveyId}/export?format=pdf`, {
       headers: { "Authorization": `Bearer ${analystToken}` }
     });
 

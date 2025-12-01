@@ -64,11 +64,12 @@ export const checkUserActive = async (c, next) => {
 
 /**
  * Higher-order middleware factory for role-based access control
- * @param {string} allowedRole - Required role ('creator' or 'analyst')
+ * @param {string} allowedRole - Required role ('admin', 'creator' or 'analyst')
  * @returns {Function} Hono middleware that checks user role from JWT payload
  * 
  * @description
  * Validates that the authenticated user has the required role.
+ * Admin users have access to all endpoints regardless of the specified role.
  * Must be chained after authMiddleware to access jwtPayload.
  * 
  * @example
@@ -77,8 +78,39 @@ export const checkUserActive = async (c, next) => {
 export const requireRole = (allowedRole) => async (c, next) => {
   const payload = c.get('jwtPayload');
   
+  // Admin tiene acceso a todo
+  if (payload.role === 'admin') {
+    await next();
+    return;
+  }
+  
+  // Para otros roles, verificar que coincida con el rol requerido
   if (payload.role !== allowedRole) {
     return c.json({ error: `Acceso denegado. Se requiere el rol de '${allowedRole}'.` }, 403);
+  }
+
+  await next();
+};
+
+/**
+ * Higher-order middleware factory for multiple role-based access control
+ * @param {string[]} allowedRoles - Array of allowed roles (e.g., ['admin', 'analyst'])
+ * @returns {Function} Hono middleware that checks if user role is in allowed list
+ * 
+ * @description
+ * Validates that the authenticated user has one of the specified roles.
+ * Must be chained after authMiddleware to access jwtPayload.
+ * 
+ * @example
+ * app.get('/reports/:id', requireRoles(['admin', 'analyst']), getReport);
+ */
+export const requireRoles = (allowedRoles) => async (c, next) => {
+  const payload = c.get('jwtPayload');
+  
+  if (!allowedRoles.includes(payload.role)) {
+    return c.json({ 
+      error: `Acceso denegado. Se requiere uno de los siguientes roles: ${allowedRoles.join(', ')}.` 
+    }, 403);
   }
 
   await next();

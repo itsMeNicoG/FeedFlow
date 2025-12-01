@@ -29,12 +29,12 @@ import jsPDF from 'jspdf';
  */
 export const getCompanyReports = (c) => {
   try {
-    const companyId = c.req.param('companyId');
-    const surveyId = c.req.query('survey_id');
-
-    if (!surveyId) {
-      return c.json({ error: "Por favor seleccione una encuesta (survey_id) para generar el reporte." }, 400);
-    }
+    // Obtener company_id del usuario autenticado
+    const payload = c.get('jwtPayload');
+    const companyId = payload.company_id;
+    
+    // Obtener surveyId del parámetro de la URL
+    const surveyId = c.req.param('surveyId');
 
     // 1. Verificar que la encuesta pertenezca a la empresa
     const survey = db.query("SELECT * FROM surveys WHERE id = ? AND company_id = ?").get(surveyId, companyId);
@@ -234,12 +234,12 @@ const getReportData = (surveyId, companyId) => {
  */
 export const exportReportExcel = async (c) => {
   try {
-    const companyId = c.req.param('companyId');
-    const surveyId = c.req.query('survey_id');
-
-    if (!surveyId) {
-      return c.json({ error: "Se requiere el parámetro survey_id" }, 400);
-    }
+    // Obtener company_id del usuario autenticado
+    const payload = c.get('jwtPayload');
+    const companyId = payload.company_id;
+    
+    // Obtener surveyId del parámetro de la URL
+    const surveyId = c.req.param('surveyId');
 
     const reportData = getReportData(surveyId, companyId);
 
@@ -327,12 +327,12 @@ export const exportReportExcel = async (c) => {
  */
 export const exportReportPDF = async (c) => {
   try {
-    const companyId = c.req.param('companyId');
-    const surveyId = c.req.query('survey_id');
-
-    if (!surveyId) {
-      return c.json({ error: "Se requiere el parámetro survey_id" }, 400);
-    }
+    // Obtener company_id del usuario autenticado
+    const payload = c.get('jwtPayload');
+    const companyId = payload.company_id;
+    
+    // Obtener surveyId del parámetro de la URL
+    const surveyId = c.req.param('surveyId');
 
     const reportData = getReportData(surveyId, companyId);
 
@@ -461,6 +461,107 @@ export const exportReportPDF = async (c) => {
 
   } catch (error) {
     console.error("Error en exportación PDF:", error);
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+/**
+ * Gets individual responses for a survey
+ * @param {import('hono').Context} c - Hono context object
+ * @returns {Response} JSON response with individual responses organized by response_id
+ * @throws {Error} If survey not found or doesn't belong to company
+ * 
+ * @description
+ * Returns raw individual responses rather than aggregated data.
+ * Each response includes all answers from one submission.
+ * 
+ * @example
+ * GET /reports/10/responses
+ * Response: {
+ *   "survey": { "id": 10, "title": "...", "total_responses": 50 },
+ *   "questions": [{"id": 1, "text": "...", "type": "text"}],
+ *   "responses": [
+ *     {
+ *       "response_id": 1,
+ *       "submitted_at": "2024-01-15T10:30:00",
+ *       "channel": "web",
+ *       "answers": {"1": "Answer text", "2": "Option A"}
+ *     }
+ *   ]
+ * }
+ */
+export const getIndividualResponses = (c) => {
+  try {
+    // Obtener company_id del usuario autenticado
+    const payload = c.get('jwtPayload');
+    const companyId = payload.company_id;
+    
+    // Obtener surveyId del parámetro de la URL
+    const surveyId = c.req.param('surveyId');
+
+    // Verificar que la encuesta pertenezca a la empresa
+    const survey = db.query("SELECT * FROM surveys WHERE id = ? AND company_id = ?").get(surveyId, companyId);
+    
+    if (!survey) {
+      return c.json({ error: "Encuesta no encontrada o no pertenece a esta empresa." }, 404);
+    }
+
+    // Obtener todas las preguntas de la encuesta
+    const questions = db.query(`
+      SELECT id, text, type, "order"
+      FROM questions
+      WHERE survey_id = ?
+      ORDER BY "order" ASC
+    `).all(surveyId);
+
+    // Obtener todas las respuestas individuales
+    const rawResponses = db.query(`
+      SELECT 
+        r.id as response_id,
+        r.channel,
+        r.submitted_at,
+        a.question_id,
+        a.value
+      FROM responses r
+      LEFT JOIN answers a ON r.id = a.response_id
+      WHERE r.survey_id = ?
+      ORDER BY r.submitted_at DESC, a.question_id ASC
+    `).all(surveyId);
+
+    // Agrupar respuestas por response_id
+    const responsesMap = new Map();
+
+    rawResponses.forEach(row => {
+      if (!responsesMap.has(row.response_id)) {
+        responsesMap.set(row.response_id, {
+          response_id: row.response_id,
+          submitted_at: row.submitted_at,
+          channel: row.channel,
+          answers: {}
+        });
+      }
+
+      // Agregar la respuesta a la pregunta correspondiente
+      if (row.question_id) {
+        responsesMap.get(row.response_id).answers[row.question_id] = row.value;
+      }
+    });
+
+    const responses = Array.from(responsesMap.values());
+
+    return c.json({
+      survey: {
+        id: survey.id,
+        title: survey.title,
+        description: survey.description,
+        total_responses: responses.length
+      },
+      questions: questions,
+      responses: responses
+    });
+
+  } catch (error) {
+    console.error("Error al obtener respuestas individuales:", error);
     return c.json({ error: error.message }, 500);
   }
 };

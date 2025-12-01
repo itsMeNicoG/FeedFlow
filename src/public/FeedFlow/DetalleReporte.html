@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedFlow - Detalle de Reporte</title>
+    <link rel="stylesheet" href="CSS/Normalize.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair:ital,opsz,wght@0,5..1200,300..900;1,5..1200,300..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="CSS/app.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="JS/auth.js"></script>
+    <script src="JS/navigation.js"></script>
+</head>
+
+<body>
+    <header class="inicio">
+        <img class="logo" src="IMG/Logo.png">
+        <h1 class="nombre-sitio"> Feed <span> Flow </span> </h1>
+        <button onclick="cerrarSesion()" style="position: absolute; right: 20px; top: 20px; padding: 10px 20px; background-color: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Cerrar Sesión</button>
+    </header>
+
+    <div class="contenedor-navegacion">
+        <nav class="nav-principal contenedor">
+            <li><a class="enlacenav" href="MenuPrincipal.html">Inicio</a></li>
+            <li id="menu-usuarios" style="display: none;"><a href="#">Gestión de usuarios</a>
+                <ul>
+                    <li><a href="CrearUsuarios.html">Crear usuarios</a></li>
+                    <li><a href="Consultarusuarios.html">Consultar, editar y eliminar</a></li>
+                </ul>
+            </li>
+            <li id="menu-encuestas" style="display: none;"><a href="#">Gestión encuestas</a>
+                <ul>
+                    <li><a href="CrearEncuestas.html">Crear encuestas</a></li>
+                    <li><a href="ConsultarEncuestas.html">Consultar, editar y eliminar encuestas</a></li>
+                </ul>
+            </li>
+            <li id="menu-reportes" style="display: none;"><a href="Reportes.html">Reportes</a></li>
+        </nav>
+    </div>
+
+    <main class="contenido-principal contenedor">
+        <div style="margin-bottom: 2rem;">
+            <a href="Reportes.html" style="text-decoration: none; color: #007bff;">← Volver a Reportes</a>
+        </div>
+
+        <h2 id="tituloEncuesta">Cargando...</h2>
+        <p id="descripcionEncuesta"></p>
+        <p id="totalRespuestas"></p>
+
+        <div style="margin: 2rem 0;">
+            <input class="btn" type="button" value="Descargar PDF" onclick="descargarPDF()">
+            <input class="btn" type="button" value="Descargar CSV" onclick="descargarCSV()" style="margin-left: 1rem;">
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="tabla-datos" id="tablaRespuestas">
+                <thead id="tablaHeaders">
+                    <!-- Los headers se cargarán dinámicamente -->
+                </thead>
+                <tbody id="tablaDatos">
+                    <tr>
+                        <td colspan="100" style="text-align: center;">Cargando respuestas...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer>
+        <p class="copyright">Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+        let surveyId = null;
+        let surveyData = null;
+        let responsesData = [];
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Verificar autenticación
+            if (!verificarAutenticacion()) return;
+            // Solo admin y analyst pueden ver reportes
+            if (!verificarAccesoRol(['admin', 'analyst'])) return;
+
+            mostrarMenuSegunRol();
+
+            // Obtener ID de la URL
+            const params = new URLSearchParams(window.location.search);
+            surveyId = params.get('id');
+
+            if (!surveyId) {
+                alert('No se especificó una encuesta válida.');
+                window.location.href = 'Reportes.html';
+                return;
+            }
+
+            cargarDatosEncuesta();
+        });
+
+        async function cargarDatosEncuesta() {
+            const token = obtenerToken();
+
+            try {
+                // Obtener respuestas individuales
+                const responsesResponse = await fetch(`${API_BASE_URL}/reports/${surveyId}/responses`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!responsesResponse.ok) {
+                    throw new Error('Error al cargar respuestas');
+                }
+
+                const data = await responsesResponse.json();
+                surveyData = data;
+
+                // Actualizar información de la encuesta
+                document.getElementById('tituloEncuesta').textContent = data.survey.title;
+                document.getElementById('descripcionEncuesta').textContent = data.survey.description || '';
+                document.getElementById('totalRespuestas').textContent = 
+                    `Total de respuestas: ${data.survey.total_responses}`;
+
+                // Mostrar tabla de respuestas
+                mostrarTablaRespuestas(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        function mostrarTablaRespuestas(data) {
+            const thead = document.getElementById('tablaHeaders');
+            const tbody = document.getElementById('tablaDatos');
+
+            if (!data.responses || data.responses.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100" style="text-align: center;">No hay respuestas para esta encuesta</td></tr>';
+                return;
+            }
+
+            // Crear headers con las preguntas
+            let headerRow = '<tr><th>#</th>';
+            data.questions.forEach((question) => {
+                headerRow += `<th>${question.text}</th>`;
+            });
+            headerRow += '<th>Canal</th><th>Fecha</th></tr>';
+            thead.innerHTML = headerRow;
+
+            // Crear filas con las respuestas
+            tbody.innerHTML = '';
+            data.responses.forEach((response, index) => {
+                const row = document.createElement('tr');
+                
+                // Número de respuesta
+                let rowHTML = `<td>${index + 1}</td>`;
+                
+                // Respuestas a cada pregunta
+                data.questions.forEach((question) => {
+                    const answer = response.answers[question.id] || '-';
+                    rowHTML += `<td>${answer}</td>`;
+                });
+                
+                // Canal y fecha
+                rowHTML += `<td>${response.channel || '-'}</td>`;
+                rowHTML += `<td>${new Date(response.submitted_at).toLocaleString('es-ES')}</td>`;
+                
+                row.innerHTML = rowHTML;
+                tbody.appendChild(row);
+            });
+
+            responsesData = data.responses;
+        }
+
+        function descargarCSV() {
+            if (!surveyData || !surveyData.responses) {
+                alert('No hay datos para descargar');
+                return;
+            }
+
+            let csv = '\uFEFF'; // BOM para Excel UTF-8
+
+            // Headers
+            csv += '"#"';
+            surveyData.questions.forEach((question) => {
+                csv += `,"${question.text.replace(/"/g, '""')}"`;
+            });
+            csv += ',"Canal","Fecha"\n';
+
+            // Datos
+            surveyData.responses.forEach((response, index) => {
+                csv += `"${index + 1}"`;
+                
+                surveyData.questions.forEach((question) => {
+                    const answer = response.answers[question.id] || '-';
+                    csv += `,"${String(answer).replace(/"/g, '""')}"`;
+                });
+                
+                csv += `,"${response.channel || '-'}"`;
+                csv += `,"${new Date(response.submitted_at).toLocaleString('es-ES')}"\n`;
+            });
+
+            // Crear y descargar archivo
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `reporte_${surveyId}_${Date.now()}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function descargarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape'); // Modo horizontal para más columnas
+
+            if (!surveyData || !surveyData.responses) {
+                alert('No hay datos para descargar');
+                return;
+            }
+
+            // Título
+            doc.setFontSize(16);
+            doc.text(surveyData.survey.title, 14, 20);
+
+            // Descripción
+            if (surveyData.survey.description) {
+                doc.setFontSize(10);
+                const descLines = doc.splitTextToSize(surveyData.survey.description, 270);
+                doc.text(descLines, 14, 28);
+            }
+
+            // Total de respuestas
+            doc.setFontSize(12);
+            doc.text(`Total de respuestas: ${surveyData.survey.total_responses}`, 14, 40);
+
+            // Preparar datos para la tabla
+            const headers = [['#']];
+            surveyData.questions.forEach((question) => {
+                // Acortar el texto de la pregunta si es muy largo
+                const shortText = question.text.length > 30 
+                    ? question.text.substring(0, 27) + '...' 
+                    : question.text;
+                headers[0].push(shortText);
+            });
+            headers[0].push('Canal');
+            headers[0].push('Fecha');
+
+            const data = surveyData.responses.map((response, index) => {
+                const row = [index + 1];
+                
+                surveyData.questions.forEach((question) => {
+                    const answer = response.answers[question.id] || '-';
+                    // Acortar respuestas largas
+                    const shortAnswer = String(answer).length > 50 
+                        ? String(answer).substring(0, 47) + '...' 
+                        : String(answer);
+                    row.push(shortAnswer);
+                });
+                
+                row.push(response.channel || '-');
+                row.push(new Date(response.submitted_at).toLocaleDateString('es-ES'));
+                
+                return row;
+            });
+
+            // Generar tabla
+            doc.autoTable({
+                head: headers,
+                body: data,
+                startY: 50,
+                styles: { 
+                    fontSize: 7,
+                    cellPadding: 2
+                },
+                headStyles: { 
+                    fillColor: [41, 128, 185],
+                    fontSize: 8,
+                    fontStyle: 'bold'
+                },
+                columnStyles: {
+                    0: { cellWidth: 10 } // Columna #
+                },
+                margin: { left: 14, right: 14 }
+            });
+
+            // Guardar PDF
+            doc.save(`reporte_${surveyId}_${Date.now()}.pdf`);
+        }
+    </script>
+
+</body>
+
+</html>
