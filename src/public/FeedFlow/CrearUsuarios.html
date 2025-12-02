@@ -105,6 +105,7 @@
                 const email = document.getElementById("email").value.trim();
                 const password = document.getElementById("Contraseña").value.trim();
                 const rol = document.getElementById("Rol").value;
+                const token = obtenerToken();
 
                 // Validaciones
                 if (!nombre || !email || !password || !rol) {
@@ -140,6 +141,7 @@
                     body: JSON.stringify(userData)
                 })
                 .then(response => {
+                    console.log("Creating user...")
                     if (!response.ok) {
                         return response.json().then(error => {
                             throw new Error(error.message || 'Error al crear el usuario');
